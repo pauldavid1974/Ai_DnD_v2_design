@@ -3,6 +3,7 @@ package com.pauldavid74.ai_dnd.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.AiProviderRepository
+import com.pauldavid74.ai_dnd.core.network.model.AiModel
 import com.pauldavid74.ai_dnd.core.network.model.LLMProvider
 import com.pauldavid74.ai_dnd.core.security.KeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +40,37 @@ class SettingsViewModel @Inject constructor(
             savedProviders = initialSavedProviders,
             isModelSaved = allProviderIds.associateWith { (keyManager.getActiveModel(it) ?: "").isNotEmpty() }
         ) }
+
+        // Background fetch for already verified active provider
+        if (activeProviderId.isNotEmpty() && initialSavedProviders.contains(activeProviderId)) {
+            loadModelsForProvider(activeProviderId)
+        }
+    }
+
+    private fun loadModelsForProvider(providerId: String) {
+        viewModelScope.launch {
+            try {
+                val models = aiRepository.getAvailableModels(providerId)
+                if (models.isNotEmpty()) {
+                    val filteredModels = filterChatModels(models)
+                    _uiState.update { it.copy(
+                        availableModels = it.availableModels + (providerId to filteredModels)
+                    ) }
+                }
+            } catch (e: Exception) {
+                // Ignore background fetch errors
+            }
+        }
+    }
+
+    private fun filterChatModels(models: List<AiModel>): List<AiModel> {
+        val filtered = models.filter { model ->
+            val id = model.id.lowercase()
+            id.contains("gpt") || id.contains("claude") || id.contains("llama") || 
+            id.contains("mistral") || id.contains("gemini") || id.contains("deepseek") ||
+            id.contains("qwen") || id.contains("phi") || id.contains("gemma")
+        }
+        return if (filtered.isEmpty()) models else filtered
     }
 
     fun onKeyChanged(key: String) {
@@ -57,13 +89,16 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 providerUrls = state.providerUrls + (providerId to url),
-                savedProviders = state.savedProviders - providerId // Re-verify if URL changes
+                savedProviders = state.savedProviders - providerId
             )
         }
     }
 
     fun onProviderSelected(providerId: String) {
         _uiState.update { it.copy(selectedProviderId = providerId) }
+        if (_uiState.value.savedProviders.contains(providerId) && _uiState.value.availableModels[providerId] == null) {
+            loadModelsForProvider(providerId)
+        }
     }
 
     fun onModelSelected(modelId: String) {
@@ -101,26 +136,14 @@ class SettingsViewModel @Inject constructor(
                     keyManager.saveCustomBaseUrl(providerId, customUrl)
                 }
                 
-                // Note: The current AiProviderRepository implementation might need updates 
-                // to handle these new providers and custom URLs. 
-                // For now, we attempt to fetch using the existing infrastructure.
                 val models = aiRepository.getAvailableModels(providerId)
+                val filteredModels = filterChatModels(models)
                 
-                val filteredModels = models.filter { model ->
-                    val id = model.id.lowercase()
-                    id.contains("gpt") || id.contains("claude") || id.contains("llama") || 
-                    id.contains("mistral") || id.contains("gemini") || id.contains("deepseek") ||
-                    id.contains("qwen") || id.contains("phi") || id.contains("gemma")
-                }
-
-                // If filter was too aggressive, show all models as fallback
-                val finalModels = if (filteredModels.isEmpty()) models else filteredModels
-
                 _uiState.update { s ->
                     s.copy(
                         isVerifying = false,
                         verificationResults = s.verificationResults + (providerId to VerificationResult.Success),
-                        availableModels = s.availableModels + (providerId to finalModels),
+                        availableModels = s.availableModels + (providerId to filteredModels),
                         savedProviders = s.savedProviders + providerId
                     )
                 }

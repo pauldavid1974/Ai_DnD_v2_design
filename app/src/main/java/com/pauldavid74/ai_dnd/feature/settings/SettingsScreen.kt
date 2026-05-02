@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -67,6 +68,7 @@ fun SettingsScreen(
             ) {
                 ProviderDropdown(
                     selectedId = state.selectedProviderId,
+                    savedProviders = state.savedProviders,
                     onSelect = viewModel::onProviderSelected
                 )
             }
@@ -161,7 +163,7 @@ private fun SetupStep(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProviderDropdown(selectedId: String, onSelect: (String) -> Unit) {
+private fun ProviderDropdown(selectedId: String, savedProviders: Set<String>, onSelect: (String) -> Unit) {
     val providers = LLMProvider.ALL_PROVIDERS
     var expanded by remember { mutableStateOf(false) }
     val currentProvider = providers.find { it.id == selectedId }
@@ -191,10 +193,16 @@ private fun ProviderDropdown(selectedId: String, onSelect: (String) -> Unit) {
             onDismissRequest = { expanded = false }
         ) {
             providers.forEach { provider ->
+                val isSetup = savedProviders.contains(provider.id)
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(provider.name, style = MaterialTheme.typography.bodyLarge)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(provider.name, style = MaterialTheme.typography.bodyLarge)
+                                if (isSetup) {
+                                    Icon(Icons.Default.CheckCircle, "Configured", tint = Moss, modifier = Modifier.size(16.dp))
+                                }
+                            }
                             Text(provider.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
@@ -294,17 +302,21 @@ private fun ModelSelectionSection(
     onSave: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (models.isEmpty()) {
+        // ALWAYS use dropdown if possible. If models is empty BUT we have a selectedId, 
+        // it means we might be loading or the provider failed to list models.
+        ModelDropdown(selectedModelId = selectedId, models = models, onSelect = onSelect)
+        
+        if (models.isEmpty() && selectedId.isBlank()) {
             Text("No chat models found. You can still enter a model name manually below.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
             OutlinedTextField(
                 value = selectedId,
                 onValueChange = onSelect,
-                label = { Text("Model ID") },
+                label = { Text("Model Selector") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             )
-        } else {
-            ModelDropdown(selectedModelId = selectedId, models = models, onSelect = onSelect)
+        } else if (models.isEmpty() && selectedId.isNotBlank()) {
+            Text("Could not fetch model list. Manual input is active.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
             
         AnimatedContent(targetState = isSaved, label = "save_btn") { saved ->
@@ -339,25 +351,36 @@ private fun ModelDropdown(selectedModelId: String, models: List<AiModel>, onSele
     ) {
         OutlinedTextField(
             value = currentModel?.name ?: selectedModelId.ifBlank { "Select a Model" },
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Active Model") },
+            onValueChange = { onSelect(it) }, // Allow typing if it's already a manual ID
+            readOnly = models.isNotEmpty(),
+            label = { Text("Model Selector") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             shape = RoundedCornerShape(8.dp)
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            models.forEach { model ->
-                DropdownMenuItem(
-                    text = { Text(model.name) },
-                    onClick = {
-                        onSelect(model.id)
-                        expanded = false
-                    }
-                )
+        if (models.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                models.forEach { model ->
+                    val isSelected = model.id == selectedModelId
+                    DropdownMenuItem(
+                        text = { 
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(model.name)
+                                if (isSelected) {
+                                    Icon(Icons.Default.CheckCircle, "Selected", tint = Moss, modifier = Modifier.size(16.dp))
+                                    Text("Selected", color = Moss, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        },
+                        onClick = {
+                            onSelect(model.id)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
