@@ -15,7 +15,16 @@ class KeyManager @Inject constructor(
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences = EncryptedSharedPreferences.create(
+    private val sharedPreferences = try {
+        createSharedPrefs(context)
+    } catch (e: Exception) {
+        // Decryption failed (e.g. AEADBadTagException). Corrupted Keystore or master key.
+        // Wipe preferences and recreate to stop crash. User will need to re-enter API keys.
+        context.getSharedPreferences("secure_keys", Context.MODE_PRIVATE).edit().clear().apply()
+        createSharedPrefs(context)
+    }
+
+    private fun createSharedPrefs(context: Context) = EncryptedSharedPreferences.create(
         context,
         "secure_keys",
         masterKey,

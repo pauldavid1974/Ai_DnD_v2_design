@@ -1,0 +1,307 @@
+package com.pauldavid74.ai_dnd.feature.game
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.pauldavid74.ai_dnd.core.ui.HapticManager
+import com.pauldavid74.ai_dnd.core.ui.components.*
+
+// ── GameScreen ────────────────────────────────────────────────────────────────
+// Drop-in replacement for V2's GameScreen.kt. Applies V1 visual language:
+//  • Ink/Parchment palette via MaterialTheme (no hardcoded Color.Black)
+//  • NarrationBlock (serif body, typewriter on newest message only)
+//  • PlayerInputBlock (right-aligned pill)
+//  • SystemBlock (monospace, centred — used for roll summaries)
+//  • ChoiceChipBar with action-type icons
+//  • HpPip + StatusIndicator in top bar
+//  • SemanticVignette fullscreen overlay driven by character HP
+//  • ShakeModifier on the chat list triggered by HeavyThud / StatusWobble
+//  • GlitchOverlay during Chronicling state
+//  • DiceRollChip centred overlay
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GameScreen(
+    characterId: Long,
+    viewModel: GameViewModel = hiltViewModel(),
+    onSettingsClick: () -> Unit,
+    onCharacterSheetClick: () -> Unit,
+) {
+    val state by viewModel.uiState.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val hapticManager = remember { HapticManager(context) }
+
+    // ── Side effects ──────────────────────────────────────────────────────────
+    LaunchedEffect(characterId) { viewModel.loadCampaign(characterId) }
+
+    LaunchedEffect(state.error) {
+        state.error?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(state.kineticEffect) {
+        state.kineticEffect?.let { effect ->
+            when (effect) {
+                KineticEffect.HeavyThud       -> hapticManager.heavyThud()
+                KineticEffect.LightClick      -> hapticManager.lightTick()
+                KineticEffect.SuccessCrescendo -> hapticManager.successCrescendo()
+                KineticEffect.StatusWobble    -> hapticManager.statusWobble()
+                KineticEffect.GlitchUpdate    -> hapticManager.lightTick()
+            }
+            viewModel.onEffectConsumed()
+        }
+    }
+
+    LaunchedEffect(state.chatMessages.size) {
+        if (state.chatMessages.isNotEmpty()) {
+            listState.animateScrollToItem(state.chatMessages.size - 1)
+        }
+    }
+
+    // Index of the last AI message — only this one gets typewriter animation
+    val lastAiIndex = state.chatMessages.indexOfLast { it.sender == MessageSender.AI }
+
+    // ── Root Box (layers: scaffold → vignette → dice chip → glitch) ───────────
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                GameTopBar(
+                    characterName = state.character?.name ?: "Adventure",
+                    currentHp = state.character?.currentHp,
+                    maxHp = state.character?.maxHp,
+                    uiStatus = state.uiStatus,
+                    onMenuClick = onCharacterSheetClick,
+                    onSettingsClick = onSettingsClick,
+                )
+            },
+            bottomBar = {
+                GameInputBar(
+                    choices = state.availableChoices,
+                    inputText = inputText,
+                    isEnabled = state.uiStatus == GameUiStatus.AwaitingInput,
+                    onInputChange = { inputText = it },
+                    onSend = {
+                        if (inputText.isNotBlank()) {
+                            viewModel.onSendMessage(inputText)
+                            inputText = ""
+                        }
+                    },
+                    onChipClick = { viewModel.onSendMessage(it) },
+                )
+            },
+        ) { padding ->
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .shakeOnEffect(state.kineticEffect)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+            ) {
+                itemsIndexed(state.chatMessages) { index, message ->
+                    when (message.sender) {
+                        MessageSender.AI ->
+                            NarrationBlock(
+                                text = message.content,
+                                animate = (index == lastAiIndex) && state.streamingMessage == null,
+                            )
+                        MessageSender.USER ->
+                            PlayerInputBlock(text = message.content)
+                        MessageSender.SYSTEM ->
+                            SystemBlock(text = message.content)
+                    }
+                }
+
+                // Live streaming bubble
+                state.streamingMessage?.let { streaming ->
+                    item {
+                        NarrationBlock(
+                            text = streaming.content,
+                            isStreaming = true,
+                        )
+                    }
+                }
+
+                // Thinking indicator (no streaming text yet)
+                if (state.uiStatus != GameUiStatus.AwaitingInput && state.streamingMessage == null) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Semantic vignette — rendered above scaffold content
+        state.character?.let { char ->
+            SemanticVignette(currentHp = char.currentHp, maxHp = char.maxHp)
+        }
+
+        // Dice result overlay — centred, auto-dismisses after 2.4 s
+        DiceRollChip(
+            result = state.diceResult,
+            modifier = Modifier.align(Alignment.Center),
+        )
+
+        // Chronicler glitch — fullscreen, topmost
+        if (state.uiStatus == GameUiStatus.Chronicling) {
+            GlitchOverlay()
+        }
+    }
+}
+
+// ── GameTopBar ────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GameTopBar(
+    characterName: String,
+    currentHp: Int?,
+    maxHp: Int?,
+    uiStatus: GameUiStatus,
+    onMenuClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+) {
+    TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        navigationIcon = {
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Description, contentDescription = "Character Sheet")
+            }
+        },
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = characterName,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                if (currentHp != null && maxHp != null) {
+                    HpPip(currentHp = currentHp, maxHp = maxHp)
+                }
+                StatusIndicator(status = uiStatus)
+            }
+        },
+        actions = {
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings")
+            }
+        },
+    )
+}
+
+// ── GameInputBar ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun GameInputBar(
+    choices: List<com.pauldavid74.ai_dnd.core.network.model.UiChoice>,
+    inputText: String,
+    isEnabled: Boolean,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onChipClick: (String) -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        tonalElevation = 4.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            // Choice chips (from AI response)
+            ChoiceChipBar(
+                choices = choices,
+                enabled = isEnabled,
+                onChoice = onChipClick,
+            )
+
+            // Text input row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = onInputChange,
+                    modifier = Modifier.weight(1f),
+                    enabled = isEnabled,
+                    placeholder = {
+                        Text(
+                            text = "What do you do?",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontStyle = FontStyle.Italic,
+                            ),
+                        )
+                    },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        disabledBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                    singleLine = false,
+                    maxLines = 4,
+                )
+
+                FilledIconButton(
+                    onClick = onSend,
+                    enabled = isEnabled && inputText.isNotBlank(),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Send",
+                    )
+                }
+            }
+        }
+    }
+}

@@ -78,8 +78,8 @@ class PromptFactory @Inject constructor(
             PREVIOUS ATTEMPT: $narrationPrefix
             
             ADJUDICATION RESULT:
-            - Success: ${adjudication is AdjudicationResult.Success || adjudication is AdjudicationResult.Hit}
-            - Details: ${adjudication.getSummary()}
+            - Success: ${adjudication is AdjudicationResult.Success || adjudication is AdjudicationResult.Hit || adjudication is AdjudicationResult.None}
+            - Details: ${if (adjudication is AdjudicationResult.None) "No check required. Proceed with narration." else adjudication.getSummary()}
             ${if (wikiContext != null) "\nSRD RULES REFERENCE:\n$wikiContext" else ""}
             
             TASK: Narrate the physical impact and final outcome of this action using the Generative Outcome JSON Schema.
@@ -93,6 +93,10 @@ class PromptFactory @Inject constructor(
 
 sealed class AdjudicationResult {
     abstract fun getSummary(): String
+
+    object None : AdjudicationResult() {
+        override fun getSummary() = ""
+    }
 
     data class Hit(val damage: Int, val targetStatus: String, val rollTotal: Int) : AdjudicationResult() {
         override fun getSummary() = "Hit! Damage: $damage. Target is now $targetStatus. (Total Roll: $rollTotal)"

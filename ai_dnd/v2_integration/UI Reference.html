@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AI D&D V2 — UI Reference</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #111; overflow: hidden; }
+  #root { width: 100%; height: 100%; }
+
+  /* Palette */
+  :root {
+    --ink:        #1C1814;
+    --parchment:  #E8DDC7;
+    --ember:      #C8662A;
+    --moss:       #5A7A4C;
+    --wine:       #7A2A2A;
+    --slate:      #2A2824;
+    --muted-ink:  #3A342C;
+    --gold:       #D4AF37;
+    --crimson:    #8B0000;
+    --muted-text: #BBAA99;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  ink: '#1C1814', parchment: '#E8DDC7', ember: '#C8662A', moss: '#5A7A4C',
+  wine: '#7A2A2A', slate: '#2A2824', mutedInk: '#3A342C', gold: '#D4AF37',
+  crimson: '#8B0000', mutedText: '#BBAA99', primaryContainer: '#4A2010',
+  secondaryContainer: '#1F3018', surfaceVariant: '#3A342C',
+};
+
+// ── Fonts ─────────────────────────────────────────────────────────────────────
+const F = {
+  display: "'Cormorant Garamond', serif",
+  body:    "'Lora', serif",
+  ui:      "'Inter', sans-serif",
+  mono:    "'JetBrains Mono', monospace",
+};
+
+// ── Phone Frame ───────────────────────────────────────────────────────────────
+function PhoneFrame({ label, children, width = 360, height = 720 }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap: 12 }}>
+      <div style={{
+        fontFamily: F.ui, fontSize: 11, fontWeight: 600, letterSpacing: '0.12em',
+        color: C.mutedText, textTransform: 'uppercase',
+      }}>{label}</div>
+      <div style={{
+        width, height, background: '#0A0A0A', borderRadius: 36,
+        border: '2px solid #333', boxShadow: '0 24px 80px rgba(0,0,0,0.8)',
+        overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Status bar */}
+        <div style={{
+          height: 28, background: C.ink, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 20px', flexShrink: 0,
+        }}>
+          <span style={{ fontFamily: F.mono, fontSize: 10, color: C.mutedText }}>9:41</span>
+          <div style={{ width: 60, height: 10, background: '#222', borderRadius: 10 }} />
+          <div style={{ display:'flex', gap: 4 }}>
+            {[1,2,3].map(i => <div key={i} style={{ width: 4, height: 8 * (i/3), background: C.mutedText, borderRadius: 1, alignSelf:'flex-end' }} />)}
+          </div>
+        </div>
+        {/* Screen content */}
+        <div style={{ flex: 1, overflow: 'hidden', background: C.ink, position:'relative' }}>
+          {children}
+        </div>
+        {/* Nav bar */}
+        <div style={{
+          height: 28, background: C.ink, display:'flex', alignItems:'center',
+          justifyContent:'center', gap: 32,
+        }}>
+          {['◁','○','□'].map(g => (
+            <div key={g} style={{ color: C.mutedText, fontSize: 13, fontFamily: F.ui }}>{g}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Top App Bar ───────────────────────────────────────────────────────────────
+function TopBar({ left, title, subtitle, right }) {
+  return (
+    <div style={{
+      height: 56, background: C.ink, display:'flex', alignItems:'center',
+      padding: '0 8px', gap: 4, borderBottom: `1px solid ${C.mutedInk}`, flexShrink: 0,
+    }}>
+      <div style={{ width: 40, display:'flex', justifyContent:'center', color: C.mutedText, fontSize: 18 }}>{left}</div>
+      <div style={{ flex: 1, padding: '0 4px' }}>
+        <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 700, color: C.parchment, lineHeight: 1.2 }}>{title}</div>
+        {subtitle && <div style={{ fontFamily: F.ui, fontSize: 10, color: C.mutedText, fontStyle:'italic' }}>{subtitle}</div>}
+      </div>
+      <div style={{ display:'flex', gap: 4 }}>
+        {right && right.map((r, i) => (
+          <div key={i} style={{ width: 40, display:'flex', justifyContent:'center', color: C.mutedText, fontSize: 18 }}>{r}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── HP Bar ────────────────────────────────────────────────────────────────────
+function HpBar({ current, max, compact }) {
+  const pct = current / max;
+  const col = pct >= .8 ? C.moss : pct >= .5 ? C.gold : pct >= .11 ? C.ember : C.wine;
+  if (compact) return (
+    <div style={{ display:'flex', alignItems:'center', gap: 4 }}>
+      <span style={{ fontSize: 11, color: col }}>♥</span>
+      <span style={{ fontFamily: F.mono, fontSize: 10, color: col }}>{current}/{max}</span>
+    </div>
+  );
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
+      <span style={{ fontSize: 12, color: col }}>♥</span>
+      <div style={{ flex: 1, height: 4, background: C.mutedInk, borderRadius: 2, overflow:'hidden' }}>
+        <div style={{ width: `${pct*100}%`, height:'100%', background: col, borderRadius: 2, transition:'width 0.3s' }} />
+      </div>
+      <span style={{ fontFamily: F.mono, fontSize: 10, color: col }}>{current}/{max}</span>
+    </div>
+  );
+}
+
+// ── Chip ─────────────────────────────────────────────────────────────────────
+function Chip({ icon, label, active }) {
+  return (
+    <div style={{
+      display:'flex', alignItems:'center', gap: 5,
+      padding: '6px 12px', borderRadius: 50,
+      background: active ? C.primaryContainer : C.slate,
+      border: `1px solid ${active ? C.ember : C.mutedInk}`,
+      fontFamily: F.ui, fontSize: 12, color: active ? C.parchment : C.mutedText,
+      whiteSpace: 'nowrap', cursor: 'pointer',
+    }}>
+      {icon && <span style={{ fontSize: 11 }}>{icon}</span>}
+      {label}
+    </div>
+  );
+}
+
+// ── Section label ──────────────────────────────────────────────────────────────
+function SectionCard({ children, style }) {
+  return (
+    <div style={{
+      background: C.slate, border: `1px solid ${C.mutedInk}`,
+      borderRadius: 8, padding: 12, ...style,
+    }}>{children}</div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN 1 — Home
+// ─────────────────────────────────────────────────────────────────────────────
+function HomeScreen() {
+  const heroes = [
+    { name: 'Aldric Ironveil', cls: 'Fighter', lvl: 3, hp: 28, maxHp: 34 },
+    { name: 'Sable Nightwhisper', cls: 'Rogue', lvl: 2, hp: 8, maxHp: 22 },
+  ];
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <TopBar left="☰" title="AI Dungeon Master" subtitle="SRD 5.2.1" right={['⚙']} />
+      <div style={{ flex:1, overflowY:'auto', padding: 16, display:'flex', flexDirection:'column', gap: 12 }}>
+        <div style={{ fontFamily: F.display, fontSize: 20, fontWeight: 600, color: C.parchment, marginBottom: 4 }}>Heroes</div>
+        {heroes.map(h => {
+          const pct = h.hp / h.maxHp;
+          const col = pct >= .8 ? C.moss : pct >= .5 ? C.gold : pct >= .11 ? C.ember : C.wine;
+          return (
+            <SectionCard key={h.name}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                <div>
+                  <div style={{ fontFamily: F.display, fontSize: 15, fontWeight: 600, color: C.parchment }}>{h.name}</div>
+                  <div style={{ fontFamily: F.ui, fontSize: 11, color: C.mutedText, marginTop: 2 }}>Level {h.lvl} {h.cls}</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap: 3, justifyContent:'flex-end', marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: col }}>♥</span>
+                    <span style={{ fontFamily: F.mono, fontSize: 10, color: col }}>{h.hp}/{h.maxHp}</span>
+                  </div>
+                  <div style={{ width: 80, height: 4, background: C.mutedInk, borderRadius: 2, overflow:'hidden' }}>
+                    <div style={{ width:`${pct*100}%`, height:'100%', background: col }} />
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          );
+        })}
+        {/* Empty slot hint */}
+        <div style={{
+          border: `1px dashed ${C.mutedInk}`, borderRadius: 8, padding: '20px 12px',
+          textAlign:'center', color: C.mutedText, fontFamily: F.ui, fontSize: 12, fontStyle:'italic',
+        }}>+ Add another hero</div>
+      </div>
+      {/* FAB */}
+      <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.mutedInk}` }}>
+        <div style={{
+          background: C.ember, borderRadius: 28, padding: '12px 20px',
+          display:'flex', alignItems:'center', justifyContent:'center', gap: 8,
+          fontFamily: F.ui, fontWeight: 600, fontSize: 14, color: C.parchment, cursor:'pointer',
+        }}>
+          <span>+</span> New Adventure
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN 2 — Character Creation (Quick Start)
+// ─────────────────────────────────────────────────────────────────────────────
+function CharacterCreateScreen() {
+  const [selected, setSelected] = useState(null);
+  const archetypes = [
+    { icon:'⚔', name:'Steel Knight', cls:'Fighter', role:'Frontline' },
+    { icon:'🗡', name:'Shadow Blade', cls:'Rogue', role:'Stealth' },
+    { icon:'📖', name:'Spell Scholar', cls:'Wizard', role:'Nuker' },
+    { icon:'☀', name:'Dawn Shepherd', cls:'Cleric', role:'Healer' },
+    { icon:'🏹', name:'Wild Tracker', cls:'Ranger', role:'Skirmisher' },
+    { icon:'🌩', name:'Storm Berserker', cls:'Barbarian', role:'Bruiser' },
+    { icon:'🎭', name:'Silver-Tongue', cls:'Bard', role:'Face' },
+    { icon:'🐉', name:'Dragon-Blooded', cls:'Sorcerer', role:'Burst' },
+    { icon:'🔥', name:'Fiend-Pact', cls:'Warlock', role:'Caster' },
+    { icon:'🌙', name:'Moon Druid', cls:'Druid', role:'Versatile' },
+  ];
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <TopBar left="←" title="Create Your Hero" right={['⚙']} />
+      {/* Tabs */}
+      <div style={{
+        display:'flex', borderBottom: `1px solid ${C.mutedInk}`,
+        background: C.ink, flexShrink: 0,
+      }}>
+        {['Quick Start','Custom'].map((t, i) => (
+          <div key={t} style={{
+            flex: 1, textAlign:'center', padding: '10px 0',
+            fontFamily: F.ui, fontSize: 13, fontWeight: i === 0 ? 600 : 400,
+            color: i === 0 ? C.ember : C.mutedText,
+            borderBottom: i === 0 ? `2px solid ${C.ember}` : '2px solid transparent',
+          }}>{t}</div>
+        ))}
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding: '12px 12px 0' }}>
+        <div style={{ fontFamily: F.body, fontSize: 12, color: C.mutedText, fontStyle:'italic', marginBottom: 12 }}>
+          Pick a ready-made hero and name them.
+        </div>
+        {/* Grid */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8 }}>
+          {archetypes.map(a => {
+            const isSelected = selected === a.name;
+            return (
+              <div key={a.name} onClick={() => setSelected(a.name)} style={{
+                background: isSelected ? C.primaryContainer : C.slate,
+                border: `${isSelected ? 2 : 1}px solid ${isSelected ? C.ember : C.mutedInk}`,
+                borderRadius: 8, padding: '10px 10px 8px',
+                cursor: 'pointer',
+              }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{a.icon}</div>
+                <div style={{ fontFamily: F.display, fontSize: 13, fontWeight: 600, color: C.parchment, lineHeight: 1.2 }}>{a.name}</div>
+                <div style={{ fontFamily: F.ui, fontSize: 11, color: isSelected ? C.ember : C.mutedText, marginTop: 2 }}>{a.cls}</div>
+                <div style={{ fontFamily: F.ui, fontSize: 10, color: C.mutedText, fontStyle:'italic', marginTop: 1 }}>{a.role}</div>
+              </div>
+            );
+          })}
+        </div>
+        {selected && (
+          <div style={{ marginTop: 16, paddingBottom: 16 }}>
+            <div style={{ height: 1, background: C.mutedInk, marginBottom: 14 }} />
+            <div style={{ fontFamily: F.display, fontSize: 15, color: C.parchment, marginBottom: 8 }}>
+              Name your hero
+            </div>
+            <div style={{
+              border: `1px solid ${C.ember}`, borderRadius: 8, padding: '10px 12px',
+              background: C.slate, fontFamily: F.body, fontSize: 14, color: C.parchment,
+            }}>Aldric_</div>
+            <div style={{
+              marginTop: 12, background: C.ember, borderRadius: 8, padding: '12px',
+              textAlign:'center', fontFamily: F.ui, fontWeight: 600, fontSize: 13, color: C.parchment,
+            }}>Begin the Adventure</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN 3 — Game / Play
+// ─────────────────────────────────────────────────────────────────────────────
+function GameScreen() {
+  const [showDice, setShowDice] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowDice(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const messages = [
+    { sender: 'ai', text: 'The torch-lit corridor stretches ahead, its ancient stones slick with moisture. A shadow shifts at the far end — the guard leans on his halberd, half-asleep.' },
+    { sender: 'user', text: 'I try to sneak past him.' },
+    { sender: 'system', text: 'd20: 7 + 5 = 12  vs DC 14  ✗' },
+    { sender: 'ai', text: 'Your boot catches a loose stone. The sound echoes sharp and clear. The guard\'s head snaps up, hand flying to his weapon — "Who\'s there?"' },
+  ];
+
+  const choices = [
+    { icon: '💬', label: 'Talk your way out' },
+    { icon: '⚔', label: 'Attack' },
+    { icon: '👁', label: 'Look for escape route' },
+    { icon: '✦', label: 'Something else…' },
+  ];
+
+  // Bloodied HP — shows amber vignette
+  const hp = { current: 14, max: 34 };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', position:'relative' }}>
+      {/* Amber vignette (wounded state) */}
+      <div style={{
+        position:'absolute', inset: 0, pointerEvents:'none', zIndex: 1,
+        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(200,102,42,0.18) 100%)',
+      }} />
+
+      <TopBar
+        left="📋"
+        title="Aldric Ironveil"
+        subtitle={<HpBar current={hp.current} max={hp.max} compact />}
+        right={['⚙']}
+      />
+
+      {/* Chat */}
+      <div style={{ flex:1, overflowY:'auto', padding: '12px 14px', display:'flex', flexDirection:'column', gap: 8, position:'relative', zIndex: 2 }}>
+        {messages.map((m, i) => {
+          if (m.sender === 'user') return (
+            <div key={i} style={{ display:'flex', justifyContent:'flex-end' }}>
+              <div style={{
+                background: C.mutedInk, border: `1px solid ${C.slate}`,
+                borderRadius: '14px 4px 14px 14px',
+                padding: '8px 12px', maxWidth: '75%',
+                fontFamily: F.body, fontSize: 13, color: C.parchment,
+              }}>{m.text}</div>
+            </div>
+          );
+          if (m.sender === 'system') return (
+            <div key={i} style={{
+              textAlign:'center', fontFamily: F.mono, fontSize: 10,
+              color: C.gold, padding: '2px 0',
+            }}>{m.text}</div>
+          );
+          return (
+            <div key={i} style={{
+              fontFamily: F.body, fontSize: 14, lineHeight: 1.6,
+              color: C.parchment, padding: '4px 0',
+            }}>{m.text}</div>
+          );
+        })}
+      </div>
+
+      {/* Dice chip overlay */}
+      {showDice && (
+        <div style={{
+          position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+          background: C.slate, border: `1.5px solid ${C.gold}`,
+          borderRadius: 50, padding: '10px 20px', zIndex: 10,
+          fontFamily: F.mono, fontSize: 12, color: C.gold,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        }}>d20: 7 + 5 = 12  vs DC 14  ✗</div>
+      )}
+
+      {/* Input bar */}
+      <div style={{
+        borderTop: `1px solid ${C.mutedInk}`, padding: '8px 12px 10px',
+        background: C.ink, zIndex: 2,
+      }}>
+        {/* Choice chips */}
+        <div style={{ display:'flex', gap: 6, overflowX:'auto', marginBottom: 8, paddingBottom: 2 }}>
+          {choices.map(c => (
+            <div key={c.label} style={{
+              display:'flex', alignItems:'center', gap: 4,
+              padding: '5px 11px', borderRadius: 50,
+              border: `1px solid ${C.ember}`, background: C.slate,
+              fontFamily: F.ui, fontSize: 11, color: C.parchment, whiteSpace:'nowrap', cursor:'pointer',
+            }}>
+              <span style={{ fontSize: 10 }}>{c.icon}</span>{c.label}
+            </div>
+          ))}
+        </div>
+        {/* Text input */}
+        <div style={{ display:'flex', gap: 8, alignItems:'center' }}>
+          <div style={{
+            flex: 1, border: `1px solid ${C.mutedInk}`, borderRadius: 8,
+            padding: '8px 12px', background: C.slate,
+            fontFamily: F.body, fontSize: 13, color: C.mutedText, fontStyle:'italic',
+          }}>What do you do?</div>
+          <div style={{
+            width: 38, height: 38, borderRadius: 8, background: C.ember,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            color: C.parchment, fontSize: 16, cursor:'pointer',
+          }}>→</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN 4 — Character Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+function SheetScreen() {
+  const char = {
+    name: 'Aldric Ironveil', cls: 'Fighter', lvl: 3, prof: 2, xp: 900, hp: 14, maxHp: 34,
+    str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10,
+    features: ['Second Wind', 'Action Surge', 'Improved Critical'],
+  };
+  const mod = v => { const m = Math.floor((v-10)/2); return m >= 0 ? `+${m}` : `${m}`; };
+  const stats = [
+    ['STR', char.str], ['DEX', char.dex], ['CON', char.con],
+    ['INT', char.int], ['WIS', char.wis], ['CHA', char.cha],
+  ];
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <TopBar left="←" title={char.name} right={[]} />
+      <div style={{ flex:1, overflowY:'auto', padding: '12px 14px', display:'flex', flexDirection:'column', gap: 12 }}>
+
+        {/* Identity */}
+        <SectionCard>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <div style={{ fontFamily: F.ui, fontSize: 12, color: C.parchment }}>Level {char.lvl} {char.cls}</div>
+              <div style={{ fontFamily: F.mono, fontSize: 10, color: C.mutedText, marginTop: 2 }}>Proficiency +{char.prof}</div>
+              <div style={{ fontFamily: F.mono, fontSize: 10, color: C.gold, marginTop: 2 }}>{char.xp} XP</div>
+            </div>
+            <div style={{ textAlign:'right' }}>
+              {(() => {
+                const pct = char.hp/char.maxHp;
+                const col = pct >= .8 ? C.moss : pct >= .5 ? C.gold : pct >= .11 ? C.ember : C.wine;
+                return (<>
+                  <div style={{ display:'flex', alignItems:'center', gap: 4, justifyContent:'flex-end' }}>
+                    <span style={{ fontSize: 12, color: col }}>♥</span>
+                    <span style={{ fontFamily: F.mono, fontSize: 14, fontWeight: 700, color: col }}>{char.hp} / {char.maxHp}</span>
+                  </div>
+                  <div style={{ width: 90, height: 5, background: C.mutedInk, borderRadius: 2, overflow:'hidden', marginTop: 5 }}>
+                    <div style={{ width:`${pct*100}%`, height:'100%', background: col }} />
+                  </div>
+                </>);
+              })()}
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Ability Scores */}
+        <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 600, color: C.parchment }}>Ability Scores</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap: 8 }}>
+          {stats.map(([label, val]) => (
+            <SectionCard key={label} style={{ textAlign:'center', padding: '10px 6px' }}>
+              <div style={{ fontFamily: F.ui, fontSize: 10, color: C.mutedText, marginBottom: 3 }}>{label}</div>
+              <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.parchment }}>{val}</div>
+              <div style={{
+                display:'inline-block', marginTop: 3,
+                background: C.primaryContainer, borderRadius: 4,
+                padding: '1px 6px',
+                fontFamily: F.mono, fontSize: 10, color: C.ember,
+              }}>{mod(val)}</div>
+            </SectionCard>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 600, color: C.parchment }}>Class Features</div>
+        <SectionCard>
+          {char.features.map((f, i) => (
+            <div key={f}>
+              {i > 0 && <div style={{ height: 1, background: C.mutedInk, margin: '6px 0' }} />}
+              <div style={{ fontFamily: F.body, fontSize: 13, color: C.parchment }}>{f}</div>
+            </div>
+          ))}
+        </SectionCard>
+
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN 5 — Settings
+// ─────────────────────────────────────────────────────────────────────────────
+function SettingsScreen() {
+  const [selected, setSelected] = useState('anthropic');
+  const providers = [
+    { id: 'openai',    label: 'OpenAI',    configured: false },
+    { id: 'anthropic', label: 'Anthropic', configured: true  },
+    { id: 'groq',      label: 'Groq',      configured: false },
+  ];
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <TopBar left="←" title="Settings" right={[]} />
+      <div style={{ flex:1, overflowY:'auto', padding: '12px 14px', display:'flex', flexDirection:'column', gap: 16 }}>
+
+        {/* Section label */}
+        <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 600, color: C.parchment }}>AI Providers</div>
+        <div style={{ fontFamily: F.body, fontSize: 12, color: C.mutedText, fontStyle:'italic', marginTop: -10 }}>
+          Keys stored locally in EncryptedSharedPreferences — never sent to any server except your chosen provider.
+        </div>
+
+        {/* Provider key cards */}
+        {providers.map(p => (
+          <div key={p.id} style={{
+            background: C.slate, border: `1px solid ${C.mutedInk}`,
+            borderRadius: 8, padding: 12,
+          }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
+              <div style={{ fontFamily: F.ui, fontSize: 13, fontWeight: 600, color: C.parchment }}>{p.label}</div>
+              <div style={{
+                padding: '2px 8px', borderRadius: 50,
+                background: p.configured ? C.secondaryContainer : C.surfaceVariant,
+                fontFamily: F.mono, fontSize: 10,
+                color: p.configured ? C.moss : C.mutedText,
+              }}>{p.configured ? '● Configured' : '○ Not set'}</div>
+            </div>
+            <div style={{
+              border: `1px solid ${p.configured ? C.ember : C.mutedInk}`,
+              borderRadius: 6, padding: '8px 10px',
+              background: C.ink, display:'flex', justifyContent:'space-between', alignItems:'center',
+            }}>
+              <span style={{ fontFamily: F.mono, fontSize: 11, color: p.configured ? C.parchment : C.mutedText, fontStyle: p.configured ? 'normal' : 'italic' }}>
+                {p.configured ? 'sk-ant-••••••••••••••••' : 'Paste API key…'}
+              </span>
+              <span style={{ fontSize: 12, color: C.mutedText }}>👁</span>
+            </div>
+          </div>
+        ))}
+
+        <div style={{
+          background: C.ember, borderRadius: 8, padding: '12px',
+          textAlign:'center', fontFamily: F.ui, fontWeight: 600, fontSize: 13, color: C.parchment,
+        }}>Save Keys</div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: C.mutedInk }} />
+
+        {/* Active provider */}
+        <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 600, color: C.parchment }}>Active Provider</div>
+        <div style={{ display:'flex', gap: 8 }}>
+          {providers.map(p => (
+            <div key={p.id} onClick={() => setSelected(p.id)} style={{
+              flex: 1, textAlign:'center', padding: '8px 4px',
+              borderRadius: 8, cursor:'pointer',
+              background: selected === p.id ? C.primaryContainer : C.slate,
+              border: `${selected === p.id ? 2 : 1}px solid ${selected === p.id ? C.ember : C.mutedInk}`,
+              fontFamily: F.ui, fontSize: 11, fontWeight: selected === p.id ? 600 : 400,
+              color: selected === p.id ? C.parchment : C.mutedText,
+            }}>{p.label}</div>
+          ))}
+        </div>
+
+        {/* Model */}
+        <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 600, color: C.parchment }}>Model</div>
+        <div style={{
+          border: `1px solid ${C.ember}`, borderRadius: 8,
+          padding: '10px 12px', background: C.slate,
+          display:'flex', justifyContent:'space-between', alignItems:'center',
+        }}>
+          <span style={{ fontFamily: F.body, fontSize: 13, color: C.parchment }}>claude-sonnet-4-5</span>
+          <span style={{ color: C.mutedText, fontSize: 12 }}>▾</span>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS LAYOUT
+// ─────────────────────────────────────────────────────────────────────────────
+const SCREENS = [
+  { id: 'home',     label: 'Home',               Component: HomeScreen },
+  { id: 'create',   label: 'Character Creation', Component: CharacterCreateScreen },
+  { id: 'game',     label: 'Game Screen',        Component: GameScreen },
+  { id: 'sheet',    label: 'Character Sheet',    Component: SheetScreen },
+  { id: 'settings', label: 'Settings',           Component: SettingsScreen },
+];
+
+function App() {
+  const [focused, setFocused] = useState(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const dragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+
+  const onMouseDown = e => {
+    if (focused) return;
+    dragging.current = true;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  };
+  const onMouseMove = e => {
+    if (!dragging.current) return;
+    setOffset(o => ({ x: o.x + e.clientX - lastPos.current.x, y: o.y + e.clientY - lastPos.current.y }));
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  };
+  const onMouseUp = () => { dragging.current = false; };
+  const onWheel = e => {
+    e.preventDefault();
+    setZoom(z => Math.min(2, Math.max(0.3, z - e.deltaY * 0.001)));
+  };
+
+  const PHONE_W = 360, PHONE_H = 720, GAP = 60;
+  const totalW = SCREENS.length * (PHONE_W + GAP) - GAP;
+
+  return (
+    <div
+      style={{ width:'100vw', height:'100vh', overflow:'hidden', cursor: focused ? 'default' : 'grab', userSelect:'none', background:'#111' }}
+      onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+      onWheel={onWheel}
+    >
+      {/* Header */}
+      <div style={{
+        position:'fixed', top: 0, left: 0, right: 0, height: 44,
+        background: 'rgba(17,17,17,0.95)', backdropFilter:'blur(8px)',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding: '0 24px', zIndex: 100, borderBottom: '1px solid #222',
+      }}>
+        <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.parchment }}>
+          AI D&D V2 — UI Reference
+        </div>
+        <div style={{ fontFamily: F.ui, fontSize: 11, color: C.mutedText }}>
+          Scroll to zoom · Drag to pan · Click phone to focus
+        </div>
+        <div style={{ fontFamily: F.mono, fontSize: 11, color: C.ember }}>
+          V1 UI on V2 Engine
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div style={{
+        position:'absolute', top: 44, left: 0, right: 0, bottom: 0,
+        display:'flex', alignItems:'center', justifyContent:'center',
+      }}>
+        <div style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+          transformOrigin: 'center center',
+          display:'flex', gap: GAP, alignItems:'flex-start', padding: 60,
+        }}>
+          {SCREENS.map(({ id, label, Component }) => (
+            <div key={id} onClick={() => setFocused(focused === id ? null : id)} style={{ cursor:'pointer' }}>
+              <PhoneFrame label={label} width={PHONE_W} height={PHONE_H}>
+                <Component />
+              </PhoneFrame>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Focus overlay */}
+      {focused && (() => {
+        const s = SCREENS.find(s => s.id === focused);
+        if (!s) return null;
+        const { Component } = s;
+        return (
+          <div
+            style={{
+              position:'fixed', inset: 0, zIndex: 200,
+              background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center',
+            }}
+            onClick={() => setFocused(null)}
+          >
+            <div onClick={e => e.stopPropagation()} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap: 16 }}>
+              <div style={{ fontFamily: F.ui, fontSize: 11, color: C.mutedText, letterSpacing:'0.1em', textTransform:'uppercase' }}>
+                {s.label} — click outside to close
+              </div>
+              <PhoneFrame label="" width={390} height={844}>
+                <Component />
+              </PhoneFrame>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

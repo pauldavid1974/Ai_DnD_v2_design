@@ -37,9 +37,42 @@ class GameViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(GameState())
     val uiState: StateFlow<GameState> = _uiState.asStateFlow()
 
+    private val _rollHistory = MutableStateFlow<List<String>>(emptyList())
+
     private var turnCount = 0
 
     private var stateMachine: StateMachine? = null
+
+    init {
+        viewModelScope.launch {
+            gameRepository.getAllMemories().collect { memories ->
+                _uiState.update { it.copy(sessionMemories = memories) }
+            }
+        }
+        viewModelScope.launch {
+            _rollHistory.collect { history ->
+                _uiState.update { it.copy(rollHistory = history) }
+            }
+        }
+    }
+
+    fun rollDice(count: Int, sides: Int, modifier: Int = 0) {
+        val diceRoll = com.pauldavid74.ai_dnd.core.rules.DiceRoll(count, sides, modifier)
+        val result = diceEngine.roll(diceRoll)
+        val modStr = if (modifier == 0) "" else if (modifier > 0) "+$modifier" else "$modifier"
+        val notation = "${count}d${sides}$modStr"
+        val resultString = "$notation -> ${result.rolls}${if(modifier != 0) " $modStr" else ""} = ${result.total}"
+        
+        // Add to roll history for the Character Sheet tab
+        _rollHistory.update { (listOf(resultString) + it).take(20) }
+
+        // ALSO: Push a system message to the chat history for immediate visibility
+        val chatRollMessage = ChatMessage(
+            sender = MessageSender.SYSTEM,
+            content = "DICE_ROLL:$resultString"
+        )
+        _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+    }
 
     init {
         viewModelScope.launch {
@@ -199,8 +232,18 @@ class GameViewModel @Inject constructor(
 
                 // Intercept: Adjudication
                 val adjudication = adjudicate(intent)
-                Log.d("GameViewModel", "Adjudication complete: ${adjudication.getSummary()}")
+                val summary = adjudication.getSummary()
+                Log.d("GameViewModel", "Adjudication complete: $summary")
                 
+                // Add AI's dice roll to chat history
+                if (summary.isNotEmpty()) {
+                    val chatRollMessage = ChatMessage(
+                        sender = MessageSender.SYSTEM,
+                        content = "DICE_ROLL:$summary"
+                    )
+                    _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+                }
+
                 // Wiki Lookups
                 val wikiContext = if (intent.wikiLookups.isNotEmpty()) {
                     intent.wikiLookups.mapNotNull { gameRepository.getSrdReference(it)?.contentJson }
@@ -208,7 +251,7 @@ class GameViewModel @Inject constructor(
                 } else null
 
                 _uiState.update { it.copy(
-                    diceResult = adjudication.getSummary(),
+                    diceResult = summary,
                     kineticEffect = if (adjudication is AdjudicationResult.Hit) KineticEffect.HeavyThud else KineticEffect.LightClick
                 ) }
                 stateMachine?.processEvent(GameEvent.MathAdjudicated)
@@ -375,7 +418,10 @@ class GameViewModel @Inject constructor(
                 if (roll.total >= dc) AdjudicationResult.Success(roll.total, dc) 
                 else AdjudicationResult.Failure(roll.total, dc)
             }
-            else -> AdjudicationResult.Success(0, 0)
+            else -> {
+                Log.d("GameViewModel", "Adjudication: None (Type: ${intent.mechanicType})")
+                AdjudicationResult.None
+            }
         }
     }
 }

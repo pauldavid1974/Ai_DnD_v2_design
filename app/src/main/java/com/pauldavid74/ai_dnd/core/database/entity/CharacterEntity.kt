@@ -8,7 +8,11 @@ import kotlin.math.floor
 data class CharacterEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    val species: String,
     val characterClass: String,
+    val background: String,
+    val originFeat: String,
+    val alignment: String,
     val level: Int,
     val experiencePoints: Int,
     
@@ -25,10 +29,15 @@ data class CharacterEntity(
     val maxHp: Int,
     val temporaryHp: Int = 0,
     
-    // Class features and spells as simple string arrays (MVP Leveling Compromise)
+    // Death Saves
+    val deathSaveSuccesses: Int = 0,
+    val deathSaveFailures: Int = 0,
+    
+    // Equipment and Features
     val classFeatures: List<String> = emptyList(),
     val spells: List<String> = emptyList(),
-    val inventory: List<String> = emptyList()
+    val inventory: List<String> = emptyList(),
+    val weaponMasteries: List<String> = emptyList()
 ) {
     // Computed Modifiers: floor((score - 10) / 2)
     val strengthModifier: Int get() = calculateModifier(strength)

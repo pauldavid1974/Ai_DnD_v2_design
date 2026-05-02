@@ -26,7 +26,7 @@ import com.pauldavid74.ai_dnd.core.database.entity.SrdReferenceEntity
         ScenarioEdgeEntity::class,
         FrontEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

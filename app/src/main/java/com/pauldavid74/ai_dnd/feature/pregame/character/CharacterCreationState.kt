@@ -2,7 +2,11 @@ package com.pauldavid74.ai_dnd.feature.pregame.character
 
 data class CharacterCreationState(
     val name: String = "",
+    val species: String = "",
     val characterClass: String = "",
+    val background: String = "",
+    val originFeat: String = "",
+    val alignment: String = "",
     val strength: Int = 8,
     val dexterity: Int = 8,
     val constitution: Int = 8,
@@ -19,7 +23,10 @@ data class CharacterCreationState(
 ) {
     val isValid: Boolean get() {
         val nameValid = name.isNotBlank()
+        val speciesValid = species.isNotBlank()
         val classValid = characterClass.isNotBlank()
+        val backgroundValid = background.isNotBlank()
+        val alignmentValid = alignment.isNotBlank()
         val statsValid = when (generationMethod) {
             GenerationMethod.STANDARD_ARRAY -> {
                 val stats = listOf(strength, dexterity, constitution, intelligence, wisdom, charisma)
@@ -30,7 +37,7 @@ data class CharacterCreationState(
                 listOf(strength, dexterity, constitution, intelligence, wisdom, charisma).all { it in 8..15 }
             }
         }
-        return nameValid && classValid && statsValid
+        return nameValid && speciesValid && classValid && backgroundValid && alignmentValid && statsValid
     }
 }
 enum class GenerationMethod {

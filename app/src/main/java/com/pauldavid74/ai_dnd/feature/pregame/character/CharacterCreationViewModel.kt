@@ -26,8 +26,24 @@ class CharacterCreationViewModel @Inject constructor(
         _uiState.update { it.copy(name = name) }
     }
 
+    fun onSpeciesChanged(species: String) {
+        _uiState.update { it.copy(species = species) }
+    }
+
     fun onClassChanged(characterClass: String) {
         _uiState.update { it.copy(characterClass = characterClass) }
+    }
+
+    fun onBackgroundChanged(background: String) {
+        _uiState.update { it.copy(background = background) }
+    }
+
+    fun onOriginFeatChanged(originFeat: String) {
+        _uiState.update { it.copy(originFeat = originFeat) }
+    }
+
+    fun onAlignmentChanged(alignment: String) {
+        _uiState.update { it.copy(alignment = alignment) }
     }
 
     fun onMethodChanged(method: GenerationMethod) {
@@ -125,7 +141,11 @@ class CharacterCreationViewModel @Inject constructor(
 
                 val character = CharacterEntity(
                     name = state.name,
+                    species = state.species,
                     characterClass = state.characterClass,
+                    background = state.background,
+                    originFeat = state.originFeat,
+                    alignment = state.alignment,
                     level = 1,
                     experiencePoints = 0,
                     strength = state.strength,
