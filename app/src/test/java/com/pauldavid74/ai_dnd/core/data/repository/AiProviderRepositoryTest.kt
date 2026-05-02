@@ -3,12 +3,14 @@ package com.pauldavid74.ai_dnd.core.data.repository
 import com.pauldavid74.ai_dnd.core.network.AiProvider
 import com.pauldavid74.ai_dnd.core.network.model.AiModel
 import com.pauldavid74.ai_dnd.core.security.KeyManager
+import io.ktor.client.*
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -20,6 +22,8 @@ class AiProviderRepositoryTest {
     private val openAiProvider = mockk<AiProvider>()
     private val anthropicProvider = mockk<AiProvider>()
     private val keyManager = mockk<KeyManager>()
+    private val httpClient = mockk<HttpClient>()
+    private val json = Json { ignoreUnknownKeys = true }
 
     @Before
     fun setup() {
@@ -28,7 +32,9 @@ class AiProviderRepositoryTest {
         
         repository = AiProviderRepositoryImpl(
             providers = setOf(openAiProvider, anthropicProvider),
-            keyManager = keyManager
+            keyManager = keyManager,
+            httpClient = httpClient,
+            json = json
         )
     }
 

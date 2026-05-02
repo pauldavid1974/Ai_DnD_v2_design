@@ -60,7 +60,13 @@ class GameViewModelTest {
     @Test
     fun `onSendMessage transitions through states and updates messages`() = runTest {
         val character = CharacterEntity(
-            name = "Grog", characterClass = "Barbarian", level = 1, experiencePoints = 0,
+            name = "Grog", 
+            species = "Half-Orc",
+            characterClass = "Barbarian", 
+            background = "Outlander",
+            originFeat = "Tough",
+            alignment = "Chaotic Neutral",
+            level = 1, experiencePoints = 0,
             strength = 16, dexterity = 10, constitution = 14, intelligence = 8, wisdom = 10, charisma = 8,
             currentHp = 14, maxHp = 14
         )

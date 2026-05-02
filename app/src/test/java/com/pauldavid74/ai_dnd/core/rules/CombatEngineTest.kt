@@ -50,7 +50,11 @@ class CombatEngineTest {
     fun testApplyDamage() {
         val character = CharacterEntity(
             name = "Test",
+            species = "Human",
             characterClass = "Fighter",
+            background = "Soldier",
+            originFeat = "Tough",
+            alignment = "Neutral",
             level = 1,
             experiencePoints = 0,
             strength = 10, dexterity = 10, constitution = 10,
@@ -69,7 +73,11 @@ class CombatEngineTest {
     fun testApplyDamageWithTempHp() {
         val character = CharacterEntity(
             name = "Test",
+            species = "Human",
             characterClass = "Fighter",
+            background = "Soldier",
+            originFeat = "Tough",
+            alignment = "Neutral",
             level = 1,
             experiencePoints = 0,
             strength = 10, dexterity = 10, constitution = 10,
