@@ -322,9 +322,9 @@ private fun hpColor(currentHp: Int, maxHp: Int): Color {
 @Composable
 fun StatusIndicator(status: GameUiStatus, modifier: Modifier = Modifier) {
     val label = when (status) {
-        GameUiStatus.DeducingIntent    -> "The Master of Dungeons reads your intent…"
+        GameUiStatus.DeducingIntent    -> "The Dungeon Master reads your intent…"
         GameUiStatus.AdjudicatingMath  -> "The dice fall…"
-        GameUiStatus.GeneratingOutcome -> "The Master of Dungeons speaks…"
+        GameUiStatus.GeneratingOutcome -> "The Dungeon Master speaks…"
         GameUiStatus.Chronicling       -> "The Chronicler stirs…"
         else                           -> null
     } ?: return

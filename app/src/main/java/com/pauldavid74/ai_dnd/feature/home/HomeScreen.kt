@@ -154,14 +154,14 @@ private fun SetupGuardOverlay(onSettingsClick: () -> Unit) {
         ) {
             /* Emoji removed as requested */
             Text(
-                text = "Summon the Master of Dungeons",
+                text = "Summon the Dungeon Master",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "The Master of Dungeons remains beyond the veil. To begin your adventure, you must provide an API key in the settings.",
+                text = "The Dungeon Master remains beyond the veil. To begin your adventure, you must provide an API key in the settings.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

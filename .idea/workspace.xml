@@ -5,32 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="74dad374-bc2b-4d13-b6a7-bf529c271cb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/network/GenericOpenAiProvider.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/network/model/LLMProvider.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/file-system.probe" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/AiProviderRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/AiProviderRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/domain/factory/PromptFactory.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/domain/factory/PromptFactory.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/domain/factory/ScenarioPatchManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/domain/factory/ScenarioPatchManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/security/KeyManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/security/KeyManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/components/GameComponents.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/components/GameComponents.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/settings/SettingsViewModel.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -89,28 +72,28 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Android App.app.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
-    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
-    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feat/api-config-overhaul&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/pdo74/AI_DND_V2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;templates.modelproviders.configurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Android App.app.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "feat/term-update-dm",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/pdo74/AI_DND_V2",
+    "settings.editor.selected.configurable": "templates.modelproviders.configurable"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
-      &quot;Markdown&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
+      "Markdown"
     ]
   }
-}</component>
+}]]></component>
   <component name="RunManager">
     <configuration name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
       <module name="Ai_DnD.app" />
