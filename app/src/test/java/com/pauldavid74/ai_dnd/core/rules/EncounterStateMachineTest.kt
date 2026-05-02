@@ -17,11 +17,12 @@ class EncounterStateMachineTest {
     private val actionValidator = mockk<ActionValidator>(relaxed = true)
     private val resourceValidator = mockk<ResourceValidator>(relaxed = true)
     private val snapshotRepository = mockk<SnapshotRepository>(relaxed = true)
+    private val reactionHandler = mockk<ReactionHandler>(relaxed = true)
 
     @Test
     fun `test state transitions`() = runTest {
         val encounterStateMachine = EncounterStateMachine(
-            this, actionValidator, resourceValidator, snapshotRepository
+            this, actionValidator, resourceValidator, snapshotRepository, reactionHandler
         )
         encounterStateMachine.start()
         val machine = encounterStateMachine.stateMachine

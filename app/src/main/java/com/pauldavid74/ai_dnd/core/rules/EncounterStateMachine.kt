@@ -17,6 +17,8 @@ sealed interface EncounterEvent : Event {
     data class IntentEvent(val data: PlayerIntent) : EncounterEvent
     data class ValidationPassedEvent(val data: PlayerIntent) : EncounterEvent
     data class ErrorEvent(val reason: String) : EncounterEvent
+    object InterruptEvent : EncounterEvent
+    object ReactionResolvedEvent : EncounterEvent
     object ActionResolved : EncounterEvent
     object EncounterEnded : EncounterEvent
     object RollbackRequested : EncounterEvent
@@ -26,7 +28,8 @@ class EncounterStateMachine(
     private val scope: CoroutineScope,
     private val actionValidator: ActionValidator,
     private val resourceValidator: ResourceValidator,
-    private val snapshotRepository: SnapshotRepository
+    private val snapshotRepository: SnapshotRepository,
+    private val reactionHandler: ReactionHandler
 ) {
     lateinit var stateMachine: StateMachine
 
@@ -34,7 +37,6 @@ class EncounterStateMachine(
         stateMachine = createStateMachine(scope, "EncounterStateMachine") {
             logger = StateMachine.Logger { println(it) }
 
-            // Defining states
             val encounterState = state("CombatEncounter") {
                 val roundState = state("CombatRound") {
                     val turnState = state("EntityTurn") {
@@ -55,6 +57,8 @@ class EncounterStateMachine(
             val turnState = encounterState.findState("CombatRound")!!.findState("EntityTurn")!! as State
             val resolutionState = state("ActionResolution")
             val bounceState = state("BounceState")
+            val damageCalculationState = state("DamageCalculation")
+            val awaitingInterruptResolution = damageCalculationState.state("AwaitingInterruptResolution")
 
             val validationState = state("ValidationState") {
                 onEntry { params ->
@@ -91,9 +95,27 @@ class EncounterStateMachine(
             resolutionState.apply {
                 onEntry {
                     println("Resolving action")
+                    this@EncounterStateMachine.scope.launch {
+                        reactionHandler.broadcastTrigger(ReactionTrigger.DamageTaken("target1", 10))
+                    }
                 }
+                
+                transition<EncounterEvent.InterruptEvent> {
+                    targetState = damageCalculationState
+                }
+                
                 transition<EncounterEvent.ActionResolved> {
                     targetState = turnState
+                }
+            }
+
+            damageCalculationState.apply {
+                awaitingInterruptResolution.onEntry {
+                    println("Awaiting reaction resolution...")
+                }
+                
+                transition<EncounterEvent.ReactionResolvedEvent> {
+                    targetState = resolutionState
                 }
             }
 
@@ -105,6 +127,9 @@ class EncounterStateMachine(
 
             encounterState.transition<EncounterEvent.RollbackRequested> {
                 // Simplified rollback trigger
+                this@EncounterStateMachine.scope.launch {
+                    snapshotRepository.rollback()
+                }
             }
 
             val endState = finalState("End")
