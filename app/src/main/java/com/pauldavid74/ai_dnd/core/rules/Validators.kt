@@ -2,6 +2,7 @@ package com.pauldavid74.ai_dnd.core.rules
 
 import com.pauldavid74.ai_dnd.core.database.dao.EntityNodeDao
 import com.pauldavid74.ai_dnd.core.network.model.CastSpellIntent
+import com.pauldavid74.ai_dnd.core.network.model.ImprovisedActionIntent
 import com.pauldavid74.ai_dnd.core.network.model.MeleeAttackIntent
 import com.pauldavid74.ai_dnd.core.network.model.MoveIntent
 import com.pauldavid74.ai_dnd.core.network.model.PlayerIntent
@@ -16,6 +17,9 @@ interface ActionValidator {
 sealed class ValidationResult {
     object Success : ValidationResult()
     data class Failure(val reason: String) : ValidationResult()
+    data class RequiresRoll(val skillType: String, val dc: Int) : ValidationResult()
+    data class RequiresAttackRoll(val targetId: String, val weaponId: String) : ValidationResult()
+    data class RequiresSpellRoll(val spellId: String, val targetIds: List<String>, val level: Int) : ValidationResult()
 }
 
 @Singleton
@@ -33,17 +37,22 @@ class ActionValidatorImpl @Inject constructor(
                 if (distance > 5.0) { // Standard 5ft melee range
                     ValidationResult.Failure("Target too far: $distance ft")
                 } else {
-                    ValidationResult.Success
+                    ValidationResult.RequiresAttackRoll(intent.targetNode, intent.weaponId)
                 }
             }
             is CastSpellIntent -> {
-                // Simplified LoS/Range check
-                ValidationResult.Success
+                ValidationResult.RequiresSpellRoll(intent.spellId, intent.targetNodes, intent.castLevel)
             }
             is MoveIntent -> {
                 ValidationResult.Success
             }
-            else -> ValidationResult.Success
+            is ImprovisedActionIntent -> {
+                if (intent.requiresCheck && intent.skillType != null && intent.dc != null) {
+                    ValidationResult.RequiresRoll(intent.skillType, intent.dc)
+                } else {
+                    ValidationResult.Success
+                }
+            }
         }
     }
 

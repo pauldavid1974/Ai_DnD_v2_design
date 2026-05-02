@@ -32,6 +32,16 @@ class CombatEngineTest {
     }
 
     @Test
+    fun testResolveAbilityCheck() {
+        val (isSuccess, result) = engine.resolveAbilityCheck(dc = 12, modifier = 3)
+        if (result.total >= 12) {
+            assertTrue(isSuccess)
+        } else {
+            assertFalse(isSuccess)
+        }
+    }
+
+    @Test
     fun testCalculateDamage() {
         val result = engine.calculateDamage("1d8", modifier = 3)
         assertTrue(result.total in 4..11)

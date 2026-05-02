@@ -20,15 +20,20 @@ class PromptFactory @Inject constructor(
             SYSTEM: You are a D&D 5.2.1 Dungeon Master. 
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
-            - Inventory: ${character.inventory.joinToString(", ").ifBlank { "Nothing but the clothes on their back" }}
+            - Inventory: ${character.inventory.joinToString(", ")}
             
             TASK: Provide a concrete, grounded opening narration for the START of a new adventure. 
-            - Describe the immediate surroundings with physical detail (sight, sound, smell).
-            - Establish a clear location and situation.
-            - Avoid flowery, vague atmospheric prose; focus on substance.
-            - End with a prompt for the player to act.
             
-            IMPORTANT: Output ONLY the narration text. Do not invent items not in the inventory.
+            JSON SCHEMA:
+            {
+              "final_narration": "Physical detail of surroundings, clear location and situation...",
+              "ui_choices": [
+                { "label": "Short action suggestion 1", "action_type": "move|attack|spell|improv" },
+                { "label": "Short action suggestion 2", "action_type": "..." }
+              ]
+            }
+            
+            IMPORTANT: Output ONLY valid, raw JSON. Do not include any other text.
         """.trimIndent()
     }
 
@@ -45,59 +50,96 @@ class PromptFactory @Inject constructor(
             "\nRELEVANT LORE:\n" + relevantMemories.joinToString("\n") { "- ${it.key}: ${it.content}" }
         } else ""
         
-        val frontContext = if (activeFronts.isNotEmpty()) {
-            "\nACTIVE THREATS (FRONTS):\n" + activeFronts.joinToString("\n") { front ->
-                "- ${front.name}: ${front.description}. Triggered Portents: ${front.portents.filter { it.isTriggered }.joinToString { it.description }}"
-            }
+        val historyContext = if (chatHistory.isNotEmpty()) {
+            "\nRECENT CONVERSATION:\n" + chatHistory.joinToString("\n") { "${it.first}: ${it.second}" }
         } else ""
         
         return """
-            SYSTEM: You are a D&D 5.2.1 Dungeon Master. 
+            SYSTEM: You are a D&D 5.2.1 Dungeon Master AI. Your task is to deduce the player's mechanical intent.
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
             - Status: ${hpBucket.name.lowercase()}
-            - Inventory: ${character.inventory.joinToString(", ").ifBlank { "Nothing" }}
-            - Recent Plot: ${lastSummary ?: "Just starting the adventure."}
+            - Inventory: ${character.inventory.joinToString(", ")}
             $memoryContext
-            $frontContext
+            $historyContext
             
-            LAST EXCHANGES:
-            ${chatHistory.joinToString("\n") { "User: ${it.first}\nAI: ${it.second}" }}
+            TASK: Map the user's input to a strict JSON intent.
+            
+            JSON SCHEMAS:
+            1. Melee Attack:
+            { "type": "melee_attack", "weaponId": "id", "targetNode": "target_id", "impossibilityScore": 0-100, "narration_prefix": "..." }
+            
+            2. Cast Spell:
+            { "type": "cast_spell", "spellId": "id", "targetNodes": ["id"], "castLevel": N, "impossibilityScore": 0-100, "narration_prefix": "..." }
+            
+            3. Move:
+            { "type": "move", "pathCoordinates": [{"x": N, "y": N}], "impossibilityScore": 0-100, "narration_prefix": "..." }
+            
+            4. Improvised Action (skill checks, interaction):
+            { 
+              "type": "improvised_action", 
+              "actionDescription": "...", 
+              "referencedEnvironmentIds": [], 
+              "impossibilityScore": 0-100, 
+              "narration_prefix": "...",
+              "requires_check": true/false,
+              "skill_type": "investigation|perception|stealth|athletics|etc",
+              "dc": 10-25
+            }
+            
+            RULES:
+            - "requires_check": Set to true if the action (like searching, climbing, or lying) has a chance of failure as per SRD 5.2.1.
+            - "skill_type": Use the most relevant D&D 5.2.1 skill (e.g., "investigation" for searching for clues).
+            - "dc": Set a logical Difficulty Class (10=Easy, 15=Medium, 20=Hard).
+            - "narration_prefix": Provide 1-2 sentences of grounded prose describing the *attempt* (not the outcome). Focus on physical action.
+            - Output ONLY the raw JSON. Do NOT include markdown code blocks.
+            - "impossibilityScore": 0 is routine, 100 is impossible.
+            - If the user is just talking/asking a question, use "improvised_action" with the description of their inquiry.
+            - Output ONLY the raw JSON object.
             
             USER INPUT: "$userInput"
-            
-            TASK: Deduce the player's intent. 
-            - mechanic_type: one of [skill_check, attack_roll, saving_throw, none]
-            - stat_required: one of [str, dex, con, int, wis, cha]
-            - narration_prefix: Grounded prose describing the *attempt*. Focus on the physical action and the immediate environment. Do not use flowery language. NEVER narrate the outcome.
-            
-            IMPORTANT: Output ONLY valid, raw JSON. Do NOT use markdown code blocks (e.g., no ```json). Do not include any other text. Do not hallucinate equipment.
         """.trimIndent()
     }
 
     fun createOutcomePrompt(
         adjudication: AdjudicationResult,
         narrationPrefix: String,
+        chatHistory: List<Pair<String, String>>,
         wikiContext: String? = null
     ): String {
-        val isSuccess = adjudication is AdjudicationResult.Success || adjudication is AdjudicationResult.Hit || adjudication is AdjudicationResult.None
         val details = if (adjudication is AdjudicationResult.None) "No check required. Proceed with successful narration." else adjudication.getSummary()
         
+        val historyContext = if (chatHistory.isNotEmpty()) {
+            "\nRECENT CONVERSATION:\n" + chatHistory.joinToString("\n") { "${it.first}: ${it.second}" }
+        } else ""
+
         return """
             SYSTEM: The deterministic dice have rolled. 
             PREVIOUS ATTEMPT: $narrationPrefix
+            $historyContext
             
             ADJUDICATION RESULT:
-            - Success: $isSuccess
+            - Success: ${adjudication !is AdjudicationResult.Failure && adjudication !is AdjudicationResult.Miss}
             - Details: $details
             ${if (wikiContext != null) "\nSRD RULES REFERENCE:\n$wikiContext" else ""}
             
             TASK: Narrate the physical impact and final outcome.
-            - final_narration: Visceral, grounded prose. Describe the physical consequences and changes to the environment using sight, sound, and touch. 
-            - Avoid flowery language, vague metaphors, or atmospheric filler. Be specific and concrete.
-            - haptic_trigger: one of [resist, expand, bounce, wobble]
             
-            IMPORTANT: Output ONLY valid, raw JSON. Do NOT use markdown code blocks (e.g., no ```json). Do not include any other text.
+            JSON SCHEMA:
+            {
+              "final_narration": "Visceral, grounded prose describing the outcome...",
+              "haptic_trigger": "one of [resist, expand, bounce, wobble]",
+              "ui_choices": [
+                { "label": "Short action suggestion 1", "action_type": "move|attack|spell|improv" },
+                { "label": "Short action suggestion 2", "action_type": "..." }
+              ]
+            }
+            
+            RULES:
+            - Ensure the narration follows the PREVIOUS ATTEMPT and RECENT CONVERSATION.
+            - Provide 2-3 logical next steps as "ui_choices".
+            - final_narration should be specific and concrete. Avoid flowery language.
+            - Output ONLY the raw JSON. Do NOT include markdown code blocks.
         """.trimIndent()
     }
 }

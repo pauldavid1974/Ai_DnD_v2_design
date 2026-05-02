@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.AiProviderRepository
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 import com.pauldavid74.ai_dnd.core.security.KeyManager
+import com.pauldavid74.ai_dnd.core.database.dao.EntityNodeDao
+import com.pauldavid74.ai_dnd.core.database.entity.EntityNode
 import com.pauldavid74.ai_dnd.core.database.entity.ChatMessageEntity
 import com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult
 import com.pauldavid74.ai_dnd.core.domain.factory.Chronicler
@@ -15,11 +17,14 @@ import com.pauldavid74.ai_dnd.core.rules.CombatEngine
 import com.pauldavid74.ai_dnd.core.rules.DiceEngine
 import com.pauldavid74.ai_dnd.core.rules.DiceRoll
 import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractor
+import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractionException
 import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepository
+import com.pauldavid74.ai_dnd.core.network.model.PlayerIntent
 import com.pauldavid74.ai_dnd.core.rules.*
 import ru.nsk.kstatemachine.state.*
 import ru.nsk.kstatemachine.statemachine.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -39,6 +44,7 @@ class GameViewModel @Inject constructor(
     private val actionValidator: ActionValidator,
     private val resourceValidator: ResourceValidator,
     private val reactionHandler: ReactionHandler,
+    private val entityNodeDao: EntityNodeDao,
     private val json: Json
 ) : ViewModel() {
 
@@ -48,9 +54,10 @@ class GameViewModel @Inject constructor(
     private val _rollHistory = MutableStateFlow<List<String>>(emptyList())
 
     private var turnCount = 0
+    private var lastDucedIntent: PlayerIntent? = null
 
     private val encounterStateMachine = EncounterStateMachine(
-        viewModelScope, actionValidator, resourceValidator, snapshotRepository, reactionHandler
+        viewModelScope, actionValidator, resourceValidator, snapshotRepository, reactionHandler, combatEngine
     )
 
     init {
@@ -58,7 +65,24 @@ class GameViewModel @Inject constructor(
             encounterStateMachine.start()
             observeStateMachine()
         }
-        
+
+        viewModelScope.launch {
+            encounterStateMachine.adjudicationResults.collect { result ->
+                _uiState.update { it.copy(diceResult = result.getSummary()) }
+                
+                // Also add to chat history as a system message
+                val chatRollMessage = ChatMessage(
+                    sender = MessageSender.SYSTEM,
+                    content = "DICE_ROLL:${result.getSummary()}"
+                )
+                _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+                persistChatMessage(chatRollMessage)
+
+                delay(2400) // Match UI animation
+                _uiState.update { it.copy(diceResult = null) }
+            }
+        }
+
         viewModelScope.launch {
             gameRepository.getAllMemories().collect { memories ->
                 _uiState.update { it.copy(sessionMemories = memories) }
@@ -76,6 +100,7 @@ class GameViewModel @Inject constructor(
             val status = when {
                 states.any { it.name == "EntityTurn" } -> GameUiStatus.AwaitingInput
                 states.any { it.name == "ValidationState" } -> GameUiStatus.DeducingIntent
+                states.any { it.name == "AbilityCheckResolution" } -> GameUiStatus.AdjudicatingMath
                 states.any { it.name == "ActionResolution" } -> {
                     // Trigger Phase C
                     triggerGenerativeOutcome()
@@ -91,45 +116,134 @@ class GameViewModel @Inject constructor(
     private fun triggerGenerativeOutcome() {
         viewModelScope.launch {
             try {
-                if (_uiState.value.character == null) return@launch
+                val currentState = _uiState.value
+                if (currentState.character == null) return@launch
                 
                 _uiState.update { it.copy(uiStatus = GameUiStatus.GeneratingOutcome) }
 
                 val providerId = keyManager.getActiveProvider() ?: "openai"
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
                 
-                // Simplified outcome generation logic for Phase 6
-                val outcomePrompt = promptFactory.createOutcomePrompt(AdjudicationResult.None, "The action proceeds.", null)
+                val prefix = lastDucedIntent?.narrationPrefix ?: "The action proceeds."
+                val historyPairs = currentState.chatMessages.filter { it.sender != MessageSender.SYSTEM }
+                    .map { (if (it.sender == MessageSender.USER) "User" else "AI") to it.content }
+
+                val outcomePrompt = promptFactory.createOutcomePrompt(
+                    adjudication = encounterStateMachine.latestAdjudication,
+                    narrationPrefix = prefix,
+                    chatHistory = historyPairs,
+                    wikiContext = null
+                )
                 
-                var fullResponse = ""
+                var accumulated = ""
                 aiRepository.streamChat(providerId, modelId, outcomePrompt).collect { chunk ->
-                    fullResponse += chunk
-                    _uiState.update { it.copy(
-                        streamingMessage = ChatMessage(MessageSender.AI, fullResponse)
-                    )}
+                    accumulated += chunk
+                    
+                    val partialNarration = extractPartialNarration(accumulated)
+                    if (partialNarration != null) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, partialNarration)
+                        )}
+                    } else if (accumulated.isNotBlank() && !accumulated.trim().startsWith("{")) {
+                        // Fallback for non-JSON streaming
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, accumulated)
+                        )}
+                    }
                 }
                 
-                val finalMsg = ChatMessage(MessageSender.AI, fullResponse)
+                val sanitized = sanitizeJson(accumulated)
+                val response = try {
+                    json.decodeFromString<GenerativeOutcomeResponse>(sanitized)
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "Failed to parse outcome JSON, using raw text fallback", e)
+                    GenerativeOutcomeResponse(
+                        finalNarration = accumulated.ifBlank { "The DM nods in acknowledgment." }
+                    )
+                }
+                
+                val finalMsg = ChatMessage(MessageSender.AI, response.finalNarration)
+                
+                val effect = when (response.hapticTrigger) {
+                    "bounce" -> KineticEffect.HeavyThud
+                    "expand" -> KineticEffect.SuccessCrescendo
+                    "resist" -> KineticEffect.LightClick
+                    "wobble" -> KineticEffect.StatusWobble
+                    else -> null
+                }
+
                 _uiState.update { state ->
                     state.copy(
                         chatMessages = state.chatMessages + finalMsg,
-                        streamingMessage = null
+                        streamingMessage = null,
+                        availableChoices = response.uiChoices,
+                        kineticEffect = effect ?: state.kineticEffect,
+                        uiStatus = GameUiStatus.AwaitingInput
                     )
                 }
                 persistChatMessage(finalMsg)
                 
+                encounterStateMachine.resetAdjudication()
                 encounterStateMachine.stateMachine.processEvent(EncounterEvent.ActionResolved)
                 
                 turnCount++
-                if (turnCount >= 5) {
+                if (turnCount >= 2) {
                     turnCount = 0
                     val currentMessages = _uiState.value.chatMessages
                     chronicler.chronicleSession(currentMessages)
                 }
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Outcome generation error", e)
-                _uiState.update { it.copy(error = e.message) }
+                _uiState.update { it.copy(
+                    uiStatus = GameUiStatus.AwaitingInput,
+                    error = "The DM lost their train of thought. (${e.localizedMessage})"
+                ) }
             }
+        }
+    }
+
+    private fun sanitizeJson(raw: String): String {
+        var cleaned = raw.trim()
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substringAfter("```json")
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substringAfter("```")
+        }
+        
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substringBeforeLast("```")
+        }
+        return cleaned.trim()
+    }
+
+    private fun extractPartialNarration(raw: String): String? {
+        val marker = "\"final_narration\":"
+        val index = raw.indexOf(marker)
+        if (index == -1) return null
+        
+        val afterMarker = raw.substring(index + marker.length).trim()
+        if (!afterMarker.startsWith("\"")) return null
+        
+        val contentStart = afterMarker.substring(1)
+        // Find the next unescaped quote
+        var contentEnd = -1
+        var isEscaped = false
+        for (i in contentStart.indices) {
+            if (contentStart[i] == '\\') {
+                isEscaped = !isEscaped
+                continue
+            }
+            if (contentStart[i] == '\"' && !isEscaped) {
+                contentEnd = i
+                break
+            }
+            isEscaped = false
+        }
+        
+        return if (contentEnd != -1) {
+            contentStart.substring(0, contentEnd).replace("\\\"", "\"")
+        } else {
+            contentStart.replace("\\\"", "\"") // Still streaming
         }
     }
 
@@ -138,13 +252,38 @@ class GameViewModel @Inject constructor(
             val character = gameRepository.getCharacter(characterId)
             _uiState.update { it.copy(character = character) }
             
-            // Restore chat history
+            // Register character in spatial engine (Phase B)
+            character?.let {
+                entityNodeDao.upsertEntity(
+                    EntityNode(
+                        id = "player1", // Matches EncounterStateMachine's actorId
+                        name = it.name,
+                        x = 10, // Default starting pos
+                        y = 10,
+                        hp = it.currentHp,
+                        maxHp = it.maxHp,
+                        ac = 15, // Simplified
+                        entityType = "PLAYER"
+                    )
+                )
+            }
+
+            // Restore chat history and dice history
             gameRepository.getChatMessages(characterId).first().let { savedMessages ->
                 if (savedMessages.isNotEmpty()) {
                     val chatMessages = savedMessages.map { entity ->
                         ChatMessage(entity.sender, entity.content, entity.timestamp)
                     }
                     _uiState.update { it.copy(chatMessages = chatMessages) }
+                    
+                    // Extract dice rolls for the Dice tab history
+                    val historicalRolls = savedMessages
+                        .filter { it.content.startsWith("DICE_ROLL:") }
+                        .map { it.content.removePrefix("DICE_ROLL:") }
+                        .reversed() // Most recent first
+                        .take(20)
+                    
+                    _rollHistory.update { historicalRolls }
                 } else {
                     startAdventure(character!!)
                 }
@@ -160,26 +299,57 @@ class GameViewModel @Inject constructor(
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
                 val introPrompt = promptFactory.createIntroPrompt(character)
                 
-                var introText = ""
+                var accumulated = ""
                 aiRepository.streamChat(providerId, modelId, introPrompt).collect { chunk ->
-                    introText += chunk
-                    _uiState.update { it.copy(
-                        streamingMessage = ChatMessage(MessageSender.AI, introText)
-                    )}
+                    accumulated += chunk
+                    
+                    val partialNarration = extractPartialNarration(accumulated)
+                    if (partialNarration != null) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, partialNarration)
+                        )}
+                    } else if (accumulated.isNotBlank() && !accumulated.trim().startsWith("{")) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, accumulated)
+                        )}
+                    }
                 }
                 
-                val finalIntro = ChatMessage(MessageSender.AI, introText)
+                val sanitized = sanitizeJson(accumulated)
+                val response = try {
+                    json.decodeFromString<GenerativeOutcomeResponse>(sanitized)
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "Failed to parse intro JSON, using raw fallback", e)
+                    GenerativeOutcomeResponse(
+                        finalNarration = accumulated.ifBlank { "You stand at the beginning of your journey." },
+                        uiChoices = listOf(
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Look around", "improv"),
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Check equipment", "improv")
+                        )
+                    )
+                }
+                
+                val finalIntro = ChatMessage(MessageSender.AI, response.finalNarration)
                 _uiState.update { state ->
                     state.copy(
                         chatMessages = state.chatMessages + finalIntro,
                         streamingMessage = null,
+                        availableChoices = response.uiChoices,
                         uiStatus = GameUiStatus.AwaitingInput
                     )
                 }
                 persistChatMessage(finalIntro)
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Error starting adventure", e)
-                _uiState.update { it.copy(uiStatus = GameUiStatus.AwaitingInput, error = "Failed to start adventure: ${e.message}") }
+                _uiState.update { state -> 
+                    state.copy(
+                        uiStatus = GameUiStatus.AwaitingInput, 
+                        error = "Failed to start adventure: ${e.message}",
+                        availableChoices = listOf(
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Try again", "improv")
+                        )
+                    )
+                }
             }
         }
     }
@@ -221,17 +391,48 @@ class GameViewModel @Inject constructor(
         val userMsg = ChatMessage(MessageSender.USER, text)
         _uiState.update { state ->
             state.copy(
-                chatMessages = state.chatMessages + userMsg
+                chatMessages = state.chatMessages + userMsg,
+                uiStatus = GameUiStatus.DeducingIntent,
+                availableChoices = emptyList(), // Clear previous choices
+                error = null
             )
         }
         persistChatMessage(userMsg)
         
         viewModelScope.launch {
-            // Process Phase A
-            intentExtractor.extractIntent(text).collect { intent ->
-                encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(intent))
-                // Proceed with Two-Call Cycle Phase B/C
-                // Phase B is handled by the state machine
+            try {
+                val currentState = _uiState.value
+                val character = currentState.character ?: return@launch
+                
+                var intentFound = false
+                // Process Phase A
+                intentExtractor.extractIntent(
+                    playerText = text,
+                    character = character,
+                    chatHistory = currentState.chatMessages.dropLast(1), // History before this message
+                    memories = currentState.sessionMemories
+                ).collect { intent ->
+                    intentFound = true
+                    lastDucedIntent = intent
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(intent))
+                }
+
+                if (!intentFound) {
+                    // Fallback: If no mechanical intent is found, treat as improvised action
+                    val fallbackIntent = com.pauldavid74.ai_dnd.core.network.model.ImprovisedActionIntent(
+                        actionDescription = text,
+                        referencedEnvironmentIds = emptyList(),
+                        narrationPrefix = "You attempt to $text."
+                    )
+                    lastDucedIntent = fallbackIntent
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(fallbackIntent))
+                }
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Intent extraction failed", e)
+                _uiState.update { it.copy(
+                    uiStatus = GameUiStatus.AwaitingInput,
+                    error = "The DM is having trouble understanding. (${e.localizedMessage})"
+                ) }
             }
         }
     }

@@ -15,13 +15,17 @@ class CombatEngine(
         targetAc: Int,
         modifier: Int,
         mode: RollMode = RollMode.Normal
-    ): Pair<Boolean, RollResult> {
+    ): com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult {
         val diceRoll = DiceRoll(count = 1, sides = 20, modifier = modifier, mode = mode)
         val result = diceEngine.roll(diceRoll)
         
         val isHit = result.isCriticalSuccess || (result.total >= targetAc && !result.isCriticalFailure)
         
-        return isHit to result
+        return if (isHit) {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Hit(0, "ALIVE", result.total) // Damage to be added
+        } else {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Miss(result.total)
+        }
     }
 
     /**
@@ -31,11 +35,16 @@ class CombatEngine(
         dc: Int,
         modifier: Int,
         mode: RollMode = RollMode.Normal
-    ): Pair<Boolean, RollResult> {
+    ): com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult {
         val diceRoll = DiceRoll(count = 1, sides = 20, modifier = modifier, mode = mode)
         val result = diceEngine.roll(diceRoll)
         val isSuccess = result.total >= dc
-        return isSuccess to result
+        
+        return if (isSuccess) {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Success(result.total, dc)
+        } else {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Failure(result.total, dc)
+        }
     }
 
     /**
@@ -69,6 +78,25 @@ class CombatEngine(
             currentHp = newCurrentHp,
             temporaryHp = newTempHp
         )
+    }
+
+    /**
+     * Executes an ability check (Investigation, Perception, etc.).
+     */
+    fun resolveAbilityCheck(
+        dc: Int,
+        modifier: Int,
+        mode: RollMode = RollMode.Normal
+    ): com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult {
+        val diceRoll = DiceRoll(count = 1, sides = 20, modifier = modifier, mode = mode)
+        val result = diceEngine.roll(diceRoll)
+        val isSuccess = result.total >= dc
+        
+        return if (isSuccess) {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Success(result.total, dc)
+        } else {
+            com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult.Failure(result.total, dc)
+        }
     }
 
     /**

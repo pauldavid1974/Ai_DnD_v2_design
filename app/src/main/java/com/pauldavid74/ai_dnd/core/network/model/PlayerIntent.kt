@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class PlayerIntent {
     abstract val impossibilityScore: Int
+    abstract val narrationPrefix: String
 }
 
 @Serializable
@@ -19,7 +20,8 @@ data class CastSpellIntent(
     val targetNodes: List<String>,
     val castLevel: Int,
     val originNode: String? = null,
-    override val impossibilityScore: Int = 0
+    override val impossibilityScore: Int = 0,
+    @SerialName("narration_prefix") override val narrationPrefix: String = ""
 ) : PlayerIntent()
 
 @Serializable
@@ -29,7 +31,8 @@ data class MeleeAttackIntent(
     val targetNode: String,
     val isFinesse: Boolean = false,
     val isMastery: Boolean = false,
-    override val impossibilityScore: Int = 0
+    override val impossibilityScore: Int = 0,
+    @SerialName("narration_prefix") override val narrationPrefix: String = ""
 ) : PlayerIntent()
 
 @Serializable
@@ -40,7 +43,8 @@ data class Coordinate(val x: Int, val y: Int)
 data class MoveIntent(
     val pathCoordinates: List<Coordinate>,
     val destinationNode: String? = null,
-    override val impossibilityScore: Int = 0
+    override val impossibilityScore: Int = 0,
+    @SerialName("narration_prefix") override val narrationPrefix: String = ""
 ) : PlayerIntent()
 
 @Serializable
@@ -48,5 +52,9 @@ data class MoveIntent(
 data class ImprovisedActionIntent(
     val actionDescription: String,
     val referencedEnvironmentIds: List<String>,
-    override val impossibilityScore: Int = 0
+    override val impossibilityScore: Int = 0,
+    @SerialName("narration_prefix") override val narrationPrefix: String = "",
+    @SerialName("requires_check") val requiresCheck: Boolean = false,
+    @SerialName("skill_type") val skillType: String? = null,
+    @SerialName("dc") val dc: Int? = null
 ) : PlayerIntent()
