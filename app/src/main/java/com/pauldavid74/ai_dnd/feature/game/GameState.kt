@@ -32,6 +32,7 @@ sealed class GameUiStatus {
     object AdjudicatingMath : GameUiStatus()
     object GeneratingOutcome : GameUiStatus()
     object Chronicling : GameUiStatus()
+    object AwaitingReaction : GameUiStatus()
 }
 
 data class ChatMessage(

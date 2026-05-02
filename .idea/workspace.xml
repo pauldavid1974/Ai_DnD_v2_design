@@ -5,16 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="74dad374-bc2b-4d13-b6a7-bf529c271cb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/rules/ReactionHandler.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/PHASE_PROMPTS/05_phase_5_reactions.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/di/RulesModule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/di/RulesModule.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/rules/EncounterStateMachine.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/rules/EncounterStateMachine.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/PHASE_PROMPTS/06_phase_6_ui.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameState.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -84,7 +76,7 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "feat/phase-5-reactions",
+    "git-widget-placeholder": "feat/phase-6-ui-integration",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/pdo74/AI_DND_V2",
     "settings.editor.selected.configurable": "templates.modelproviders.configurable"

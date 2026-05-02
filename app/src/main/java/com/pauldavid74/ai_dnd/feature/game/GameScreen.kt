@@ -6,8 +6,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,6 +92,7 @@ fun GameScreen(
                     uiStatus = state.uiStatus,
                     onMenuClick = onCharacterSheetClick,
                     onSettingsClick = onSettingsClick,
+                    onUndoClick = { viewModel.onUndo() },
                 )
             },
             bottomBar = {
@@ -190,6 +193,7 @@ private fun GameTopBar(
     uiStatus: GameUiStatus,
     onMenuClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onUndoClick: () -> Unit,
 ) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
@@ -216,6 +220,9 @@ private fun GameTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onUndoClick) {
+                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+            }
             IconButton(onClick = onSettingsClick) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings")
             }
