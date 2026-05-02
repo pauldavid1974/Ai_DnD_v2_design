@@ -2,6 +2,10 @@ package com.pauldavid74.ai_dnd.core.di
 
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepositoryImpl
+import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractor
+import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractorImpl
+import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepository
+import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -17,4 +21,16 @@ abstract class RepositoryModule {
     abstract fun bindGameRepository(
         gameRepositoryImpl: GameRepositoryImpl
     ): GameRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIntentExtractor(
+        intentExtractorImpl: IntentExtractorImpl
+    ): IntentExtractor
+
+    @Binds
+    @Singleton
+    abstract fun bindSnapshotRepository(
+        snapshotRepositoryImpl: SnapshotRepositoryImpl
+    ): SnapshotRepository
 }

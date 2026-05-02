@@ -2,6 +2,7 @@ package com.pauldavid74.ai_dnd.core.di
 
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.sse.*
@@ -19,6 +20,7 @@ import dagger.Provides
 import dagger.multibindings.IntoSet
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -51,6 +53,18 @@ abstract class NetworkModule {
                 install(SSE)
                 install(Logging) {
                     level = LogLevel.INFO
+                }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 300_000 // 5 minutes
+                    connectTimeoutMillis = 30_000 // 30 seconds
+                    socketTimeoutMillis = 300_000 // 5 minutes
+                }
+                engine {
+                    config {
+                        connectTimeout(30, TimeUnit.SECONDS)
+                        readTimeout(300, TimeUnit.SECONDS)
+                        writeTimeout(300, TimeUnit.SECONDS)
+                    }
                 }
             }
         }

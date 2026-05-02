@@ -23,10 +23,23 @@ class Chronicler @Inject constructor(
         
         val prompt = """
             SYSTEM: You are the Chronicler. Summarize the following D&D session transcript and update the memory database.
+            
             TRANSCRIPT:
             $transcript
             
-            TASK: Output the Chronicler JSON Schema with a session_summary and memory_updates.
+            TASK: 
+            1. session_summary: A concise, 1-2 sentence overview of the latest events.
+            2. memory_updates: Identify any new NPCs, locations, or major plot facts revealed.
+            
+            JSON SCHEMA:
+            {
+              "session_summary": "...",
+              "memory_updates": [
+                { "entityId": "name", "newFact": "..." }
+              ]
+            }
+            
+            IMPORTANT: Output ONLY valid JSON.
         """.trimIndent()
 
         var responseJson = ""
@@ -38,9 +51,10 @@ class Chronicler @Inject constructor(
             val result = json.decodeFromString<ChroniclerResponse>(responseJson)
             
             // Persist summary
+            val summaryKey = "summary_${System.currentTimeMillis()}"
             gameRepository.addMemory(MemoryEntity(
                 type = "PLOT_SUMMARY",
-                key = "latest",
+                key = summaryKey,
                 content = result.sessionSummary
             ))
 

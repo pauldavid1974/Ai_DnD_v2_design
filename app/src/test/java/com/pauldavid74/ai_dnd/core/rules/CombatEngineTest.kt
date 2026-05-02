@@ -32,6 +32,16 @@ class CombatEngineTest {
     }
 
     @Test
+    fun testResolveAbilityCheck() {
+        val (isSuccess, result) = engine.resolveAbilityCheck(dc = 12, modifier = 3)
+        if (result.total >= 12) {
+            assertTrue(isSuccess)
+        } else {
+            assertFalse(isSuccess)
+        }
+    }
+
+    @Test
     fun testCalculateDamage() {
         val result = engine.calculateDamage("1d8", modifier = 3)
         assertTrue(result.total in 4..11)
@@ -50,7 +60,11 @@ class CombatEngineTest {
     fun testApplyDamage() {
         val character = CharacterEntity(
             name = "Test",
+            species = "Human",
             characterClass = "Fighter",
+            background = "Soldier",
+            originFeat = "Tough",
+            alignment = "Neutral",
             level = 1,
             experiencePoints = 0,
             strength = 10, dexterity = 10, constitution = 10,
@@ -69,7 +83,11 @@ class CombatEngineTest {
     fun testApplyDamageWithTempHp() {
         val character = CharacterEntity(
             name = "Test",
+            species = "Human",
             characterClass = "Fighter",
+            background = "Soldier",
+            originFeat = "Tough",
+            alignment = "Neutral",
             level = 1,
             experiencePoints = 0,
             strength = 10, dexterity = 10, constitution = 10,

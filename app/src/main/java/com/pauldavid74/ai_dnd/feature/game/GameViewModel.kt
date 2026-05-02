@@ -6,18 +6,25 @@ import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.AiProviderRepository
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 import com.pauldavid74.ai_dnd.core.security.KeyManager
+import com.pauldavid74.ai_dnd.core.database.dao.EntityNodeDao
+import com.pauldavid74.ai_dnd.core.database.entity.EntityNode
 import com.pauldavid74.ai_dnd.core.database.entity.ChatMessageEntity
 import com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult
 import com.pauldavid74.ai_dnd.core.domain.factory.Chronicler
 import com.pauldavid74.ai_dnd.core.domain.factory.PromptFactory
-import com.pauldavid74.ai_dnd.core.network.model.IntentDeductionResponse
 import com.pauldavid74.ai_dnd.core.network.model.GenerativeOutcomeResponse
 import com.pauldavid74.ai_dnd.core.rules.CombatEngine
 import com.pauldavid74.ai_dnd.core.rules.DiceEngine
 import com.pauldavid74.ai_dnd.core.rules.DiceRoll
+import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractor
+import com.pauldavid74.ai_dnd.core.data.repository.IntentExtractionException
+import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepository
+import com.pauldavid74.ai_dnd.core.network.model.PlayerIntent
+import com.pauldavid74.ai_dnd.core.rules.*
 import ru.nsk.kstatemachine.state.*
 import ru.nsk.kstatemachine.statemachine.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -32,6 +39,12 @@ class GameViewModel @Inject constructor(
     private val chronicler: Chronicler,
     private val diceEngine: DiceEngine,
     private val combatEngine: CombatEngine,
+    private val intentExtractor: IntentExtractor,
+    private val snapshotRepository: SnapshotRepository,
+    private val actionValidator: ActionValidator,
+    private val resourceValidator: ResourceValidator,
+    private val reactionHandler: ReactionHandler,
+    private val entityNodeDao: EntityNodeDao,
     private val json: Json
 ) : ViewModel() {
 
@@ -41,10 +54,35 @@ class GameViewModel @Inject constructor(
     private val _rollHistory = MutableStateFlow<List<String>>(emptyList())
 
     private var turnCount = 0
+    private var lastDucedIntent: PlayerIntent? = null
 
-    private var stateMachine: StateMachine? = null
+    private val encounterStateMachine = EncounterStateMachine(
+        viewModelScope, actionValidator, resourceValidator, snapshotRepository, reactionHandler, combatEngine
+    )
 
     init {
+        viewModelScope.launch {
+            encounterStateMachine.start()
+            observeStateMachine()
+        }
+
+        viewModelScope.launch {
+            encounterStateMachine.adjudicationResults.collect { result ->
+                _uiState.update { it.copy(diceResult = result.getSummary()) }
+                
+                // Also add to chat history as a system message
+                val chatRollMessage = ChatMessage(
+                    sender = MessageSender.SYSTEM,
+                    content = "DICE_ROLL:${result.getSummary()}"
+                )
+                _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+                persistChatMessage(chatRollMessage)
+
+                delay(2400) // Match UI animation
+                _uiState.update { it.copy(diceResult = null) }
+            }
+        }
+
         viewModelScope.launch {
             gameRepository.getAllMemories().collect { memories ->
                 _uiState.update { it.copy(sessionMemories = memories) }
@@ -57,69 +95,155 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    fun rollDice(count: Int, sides: Int, modifier: Int = 0) {
-        val diceRoll = com.pauldavid74.ai_dnd.core.rules.DiceRoll(count, sides, modifier)
-        val result = diceEngine.roll(diceRoll)
-        val modStr = if (modifier == 0) "" else if (modifier > 0) "+$modifier" else "$modifier"
-        val notation = "${count}d${sides}$modStr"
-        val resultString = "$notation -> ${result.rolls}${if(modifier != 0) " $modStr" else ""} = ${result.total}"
-        
-        // Add to roll history for the Character Sheet tab
-        _rollHistory.update { (listOf(resultString) + it).take(20) }
-
-        // ALSO: Push a system message to the chat history for immediate visibility
-        val chatRollMessage = ChatMessage(
-            sender = MessageSender.SYSTEM,
-            content = "DICE_ROLL:$resultString"
-        )
-        _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
-        persistChatMessage(chatRollMessage)
+    private suspend fun observeStateMachine() {
+        encounterStateMachine.stateMachine.activeStatesFlow().collect { states ->
+            val status = when {
+                states.any { it.name == "EntityTurn" } -> GameUiStatus.AwaitingInput
+                states.any { it.name == "ValidationState" } -> GameUiStatus.DeducingIntent
+                states.any { it.name == "AbilityCheckResolution" } -> GameUiStatus.AdjudicatingMath
+                states.any { it.name == "ActionResolution" } -> {
+                    // Trigger Phase C
+                    triggerGenerativeOutcome()
+                    GameUiStatus.AdjudicatingMath
+                }
+                states.any { it.name == "AwaitingInterruptResolution" } -> GameUiStatus.AwaitingReaction
+                else -> GameUiStatus.AwaitingInput
+            }
+            _uiState.update { it.copy(uiStatus = status) }
+        }
     }
 
-    init {
+    private fun triggerGenerativeOutcome() {
         viewModelScope.launch {
-            stateMachine = createStateMachine(viewModelScope) {
-                val awaitingInput = addInitialState(DefaultState("AwaitingInput"))
-                val deducingIntent = addState(DefaultState("DeducingIntent"))
-                val adjudicatingMath = addState(DefaultState("AdjudicatingMath"))
-                val generatingOutcome = addState(DefaultState("GeneratingOutcome"))
-                val chronicling = addState(DefaultState("Chronicling"))
+            try {
+                val currentState = _uiState.value
+                if (currentState.character == null) return@launch
+                
+                _uiState.update { it.copy(uiStatus = GameUiStatus.GeneratingOutcome) }
 
-                awaitingInput {
-                    transition<GameEvent.SendMessage> { targetState = deducingIntent }
+                val providerId = keyManager.getActiveProvider() ?: "openai"
+                val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
+                
+                val prefix = lastDucedIntent?.narrationPrefix ?: "The action proceeds."
+                val historyPairs = currentState.chatMessages.filter { it.sender != MessageSender.SYSTEM }
+                    .map { (if (it.sender == MessageSender.USER) "User" else "AI") to it.content }
+
+                val outcomePrompt = promptFactory.createOutcomePrompt(
+                    adjudication = encounterStateMachine.latestAdjudication,
+                    narrationPrefix = prefix,
+                    chatHistory = historyPairs,
+                    wikiContext = null
+                )
+                
+                var accumulated = ""
+                aiRepository.streamChat(providerId, modelId, outcomePrompt).collect { chunk ->
+                    accumulated += chunk
+                    
+                    val partialNarration = extractPartialNarration(accumulated)
+                    if (partialNarration != null) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, partialNarration)
+                        )}
+                    } else if (accumulated.isNotBlank() && !accumulated.trim().startsWith("{")) {
+                        // Fallback for non-JSON streaming
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, accumulated)
+                        )}
+                    }
                 }
-                deducingIntent {
-                    transition<GameEvent.IntentDeducted> { targetState = adjudicatingMath }
-                    transition<GameEvent.ErrorOccurred> { targetState = awaitingInput }
+                
+                val sanitized = sanitizeJson(accumulated)
+                val response = try {
+                    json.decodeFromString<GenerativeOutcomeResponse>(sanitized)
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "Failed to parse outcome JSON, using raw text fallback", e)
+                    GenerativeOutcomeResponse(
+                        finalNarration = accumulated.ifBlank { "The DM nods in acknowledgment." }
+                    )
                 }
-                adjudicatingMath {
-                    transition<GameEvent.MathAdjudicated> { targetState = generatingOutcome }
-                }
-                generatingOutcome {
-                    transition<GameEvent.OutcomeGenerated> { targetState = awaitingInput }
-                    transition<GameEvent.ChronicleTriggered> { targetState = chronicling }
-                }
-                chronicling {
-                    transition<GameEvent.OutcomeGenerated> { targetState = awaitingInput }
+                
+                val finalMsg = ChatMessage(MessageSender.AI, response.finalNarration)
+                
+                val effect = when (response.hapticTrigger) {
+                    "bounce" -> KineticEffect.HeavyThud
+                    "expand" -> KineticEffect.SuccessCrescendo
+                    "resist" -> KineticEffect.LightClick
+                    "wobble" -> KineticEffect.StatusWobble
+                    else -> null
                 }
 
-                // We'll use State listeners instead
-                awaitingInput {
-                    onEntry { _uiState.update { it.copy(uiStatus = GameUiStatus.AwaitingInput) } }
+                _uiState.update { state ->
+                    state.copy(
+                        chatMessages = state.chatMessages + finalMsg,
+                        streamingMessage = null,
+                        availableChoices = response.uiChoices,
+                        kineticEffect = effect ?: state.kineticEffect,
+                        uiStatus = GameUiStatus.AwaitingInput
+                    )
                 }
-                deducingIntent {
-                    onEntry { _uiState.update { it.copy(uiStatus = GameUiStatus.DeducingIntent) } }
+                persistChatMessage(finalMsg)
+                
+                encounterStateMachine.resetAdjudication()
+                encounterStateMachine.stateMachine.processEvent(EncounterEvent.ActionResolved)
+                
+                turnCount++
+                if (turnCount >= 2) {
+                    turnCount = 0
+                    val currentMessages = _uiState.value.chatMessages
+                    chronicler.chronicleSession(currentMessages)
                 }
-                adjudicatingMath {
-                    onEntry { _uiState.update { it.copy(uiStatus = GameUiStatus.AdjudicatingMath) } }
-                }
-                generatingOutcome {
-                    onEntry { _uiState.update { it.copy(uiStatus = GameUiStatus.GeneratingOutcome) } }
-                }
-                chronicling {
-                    onEntry { _uiState.update { it.copy(uiStatus = GameUiStatus.Chronicling) } }
-                }
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Outcome generation error", e)
+                _uiState.update { it.copy(
+                    uiStatus = GameUiStatus.AwaitingInput,
+                    error = "The DM lost their train of thought. (${e.localizedMessage})"
+                ) }
             }
+        }
+    }
+
+    private fun sanitizeJson(raw: String): String {
+        var cleaned = raw.trim()
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substringAfter("```json")
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substringAfter("```")
+        }
+        
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substringBeforeLast("```")
+        }
+        return cleaned.trim()
+    }
+
+    private fun extractPartialNarration(raw: String): String? {
+        val marker = "\"final_narration\":"
+        val index = raw.indexOf(marker)
+        if (index == -1) return null
+        
+        val afterMarker = raw.substring(index + marker.length).trim()
+        if (!afterMarker.startsWith("\"")) return null
+        
+        val contentStart = afterMarker.substring(1)
+        // Find the next unescaped quote
+        var contentEnd = -1
+        var isEscaped = false
+        for (i in contentStart.indices) {
+            if (contentStart[i] == '\\') {
+                isEscaped = !isEscaped
+                continue
+            }
+            if (contentStart[i] == '\"' && !isEscaped) {
+                contentEnd = i
+                break
+            }
+            isEscaped = false
+        }
+        
+        return if (contentEnd != -1) {
+            contentStart.substring(0, contentEnd).replace("\\\"", "\"")
+        } else {
+            contentStart.replace("\\\"", "\"") // Still streaming
         }
     }
 
@@ -128,15 +252,41 @@ class GameViewModel @Inject constructor(
             val character = gameRepository.getCharacter(characterId)
             _uiState.update { it.copy(character = character) }
             
-            // Restore chat history
-            val savedMessages = gameRepository.getChatMessages(characterId).first()
-            if (savedMessages.isNotEmpty()) {
-                val chatMessages = savedMessages.map { entity ->
-                    ChatMessage(entity.sender, entity.content, entity.timestamp)
+            // Register character in spatial engine (Phase B)
+            character?.let {
+                entityNodeDao.upsertEntity(
+                    EntityNode(
+                        id = "player1", // Matches EncounterStateMachine's actorId
+                        name = it.name,
+                        x = 10, // Default starting pos
+                        y = 10,
+                        hp = it.currentHp,
+                        maxHp = it.maxHp,
+                        ac = 15, // Simplified
+                        entityType = "PLAYER"
+                    )
+                )
+            }
+
+            // Restore chat history and dice history
+            gameRepository.getChatMessages(characterId).first().let { savedMessages ->
+                if (savedMessages.isNotEmpty()) {
+                    val chatMessages = savedMessages.map { entity ->
+                        ChatMessage(entity.sender, entity.content, entity.timestamp)
+                    }
+                    _uiState.update { it.copy(chatMessages = chatMessages) }
+                    
+                    // Extract dice rolls for the Dice tab history
+                    val historicalRolls = savedMessages
+                        .filter { it.content.startsWith("DICE_ROLL:") }
+                        .map { it.content.removePrefix("DICE_ROLL:") }
+                        .reversed() // Most recent first
+                        .take(20)
+                    
+                    _rollHistory.update { historicalRolls }
+                } else {
+                    startAdventure(character!!)
                 }
-                _uiState.update { it.copy(chatMessages = chatMessages) }
-            } else {
-                startAdventure(character!!)
             }
         }
     }
@@ -149,26 +299,57 @@ class GameViewModel @Inject constructor(
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
                 val introPrompt = promptFactory.createIntroPrompt(character)
                 
-                var introText = ""
+                var accumulated = ""
                 aiRepository.streamChat(providerId, modelId, introPrompt).collect { chunk ->
-                    introText += chunk
-                    _uiState.update { it.copy(
-                        streamingMessage = ChatMessage(MessageSender.AI, introText)
-                    )}
+                    accumulated += chunk
+                    
+                    val partialNarration = extractPartialNarration(accumulated)
+                    if (partialNarration != null) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, partialNarration)
+                        )}
+                    } else if (accumulated.isNotBlank() && !accumulated.trim().startsWith("{")) {
+                        _uiState.update { it.copy(
+                            streamingMessage = ChatMessage(MessageSender.AI, accumulated)
+                        )}
+                    }
                 }
                 
-                val finalIntro = ChatMessage(MessageSender.AI, introText)
+                val sanitized = sanitizeJson(accumulated)
+                val response = try {
+                    json.decodeFromString<GenerativeOutcomeResponse>(sanitized)
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "Failed to parse intro JSON, using raw fallback", e)
+                    GenerativeOutcomeResponse(
+                        finalNarration = accumulated.ifBlank { "You stand at the beginning of your journey." },
+                        uiChoices = listOf(
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Look around", "improv"),
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Check equipment", "improv")
+                        )
+                    )
+                }
+                
+                val finalIntro = ChatMessage(MessageSender.AI, response.finalNarration)
                 _uiState.update { state ->
                     state.copy(
                         chatMessages = state.chatMessages + finalIntro,
                         streamingMessage = null,
+                        availableChoices = response.uiChoices,
                         uiStatus = GameUiStatus.AwaitingInput
                     )
                 }
                 persistChatMessage(finalIntro)
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Error starting adventure", e)
-                _uiState.update { it.copy(uiStatus = GameUiStatus.AwaitingInput, error = "Failed to start adventure: ${e.message}") }
+                _uiState.update { state -> 
+                    state.copy(
+                        uiStatus = GameUiStatus.AwaitingInput, 
+                        error = "Failed to start adventure: ${e.message}",
+                        availableChoices = listOf(
+                            com.pauldavid74.ai_dnd.core.network.model.UiChoice("Try again", "improv")
+                        )
+                    )
+                }
             }
         }
     }
@@ -187,273 +368,82 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun rollDice(count: Int, sides: Int, modifier: Int = 0) {
+        val diceRoll = DiceRoll(count, sides, modifier)
+        val result = diceEngine.roll(diceRoll)
+        val modStr = if (modifier == 0) "" else if (modifier > 0) "+$modifier" else modifier.toString()
+        val notation = "${count}d$sides$modStr"
+        val resultString = "$notation -> ${result.rolls}${if(modifier != 0) " $modStr" else ""} = ${result.total}"
+        
+        _rollHistory.update { (listOf(resultString) + it).take(20) }
+
+        val chatRollMessage = ChatMessage(
+            sender = MessageSender.SYSTEM,
+            content = "DICE_ROLL:$resultString"
+        )
+        _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+        persistChatMessage(chatRollMessage)
+    }
+
     fun onSendMessage(text: String) {
         if (text.isBlank() || _uiState.value.uiStatus != GameUiStatus.AwaitingInput) return
 
         val userMsg = ChatMessage(MessageSender.USER, text)
         _uiState.update { state ->
             state.copy(
-                chatMessages = state.chatMessages + userMsg
+                chatMessages = state.chatMessages + userMsg,
+                uiStatus = GameUiStatus.DeducingIntent,
+                availableChoices = emptyList(), // Clear previous choices
+                error = null
             )
         }
         persistChatMessage(userMsg)
         
         viewModelScope.launch {
-            stateMachine?.processEvent(GameEvent.SendMessage(text))
-            executeTwoCallCycle(text)
-        }
-    }
-
-    private fun executeTwoCallCycle(userInput: String) {
-        viewModelScope.launch {
             try {
-                Log.d("GameViewModel", "Executing Two-Call Cycle for: $userInput")
-                val character = _uiState.value.character ?: run {
-                    Log.e("GameViewModel", "No character loaded! Aborting cycle.")
-                    return@launch
-                }
-                val chatHistory = _uiState.value.chatMessages
-                    .filter { it.sender != MessageSender.SYSTEM }
-                    .takeLast(6)
-                    .chunked(2)
-                    .map { Pair(it.getOrNull(0)?.content ?: "", it.getOrNull(1)?.content ?: "") }
-
-                // Call 1: Intent Deduction
-                val providerId = keyManager.getActiveProvider() ?: "openai"
-                val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
+                val currentState = _uiState.value
+                val character = currentState.character ?: return@launch
                 
-                Log.d("GameViewModel", "Call 1: Intent Deduction using $providerId ($modelId)")
-
-                // JIT Memory Injection
-                val contextText = userInput + chatHistory.joinToString { it.first + it.second }
-                val entities = detectEntities(contextText)
-                val relevantMemories = entities.mapNotNull { key -> 
-                    gameRepository.getMemory(key) 
-                }
-                
-                // Active Fronts
-                val activeFronts = gameRepository.getFrontsForCampaign("default").first().map {
-                    com.pauldavid74.ai_dnd.core.domain.model.Front(it.id, it.name, it.description, it.doom, it.portents)
-                }
-
-                val intentPrompt = promptFactory.createIntentPrompt(character, null, chatHistory, relevantMemories, activeFronts, userInput)
-                var intentJson = ""
-                aiRepository.streamChat(providerId, modelId, intentPrompt).collect { chunk ->
-                    intentJson += chunk
-                }
-                
-                if (intentJson.isEmpty()) {
-                    Log.e("GameViewModel", "Intent JSON is empty! Check API key for $providerId")
-                    throw Exception("Failed to deduce intent. Is your $providerId API key set in Settings?")
+                var intentFound = false
+                // Process Phase A
+                intentExtractor.extractIntent(
+                    playerText = text,
+                    character = character,
+                    chatHistory = currentState.chatMessages.dropLast(1), // History before this message
+                    memories = currentState.sessionMemories
+                ).collect { intent ->
+                    intentFound = true
+                    lastDucedIntent = intent
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(intent))
                 }
 
-                Log.d("GameViewModel", "Received Intent JSON: $intentJson")
-                val sanitizedIntent = intentJson.trim()
-                    .removePrefix("```json")
-                    .removePrefix("```")
-                    .removeSuffix("```")
-                    .trim()
-                val intent = json.decodeFromString<IntentDeductionResponse>(sanitizedIntent)
-                _uiState.update { it.copy(kineticEffect = KineticEffect.LightClick) }
-                stateMachine?.processEvent(GameEvent.IntentDeducted)
-
-                // Intercept: Adjudication
-                val adjudication = adjudicate(intent)
-                val summary = adjudication.getSummary()
-                Log.d("GameViewModel", "Adjudication complete: $summary")
-                
-                // Add AI's dice roll to chat history
-                if (summary.isNotEmpty()) {
-                    val chatRollMessage = ChatMessage(
-                        sender = MessageSender.SYSTEM,
-                        content = "DICE_ROLL:$summary"
+                if (!intentFound) {
+                    // Fallback: If no mechanical intent is found, treat as improvised action
+                    val fallbackIntent = com.pauldavid74.ai_dnd.core.network.model.ImprovisedActionIntent(
+                        actionDescription = text,
+                        referencedEnvironmentIds = emptyList(),
+                        narrationPrefix = "You attempt to $text."
                     )
-                    _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
-                    persistChatMessage(chatRollMessage)
+                    lastDucedIntent = fallbackIntent
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(fallbackIntent))
                 }
-
-                // Wiki Lookups
-                val wikiContext = if (intent.wikiLookups.isNotEmpty()) {
-                    intent.wikiLookups.mapNotNull { gameRepository.getSrdReference(it)?.contentJson }
-                        .joinToString("\n")
-                } else null
-
-                _uiState.update { it.copy(
-                    diceResult = summary,
-                    kineticEffect = if (adjudication is AdjudicationResult.Hit) KineticEffect.HeavyThud else KineticEffect.LightClick
-                ) }
-                stateMachine?.processEvent(GameEvent.MathAdjudicated)
-                
-                // Call 2: Generative Outcome
-                val activeProviderId = keyManager.getActiveProvider() ?: "openai"
-                val activeModelId = keyManager.getActiveModel(activeProviderId) ?: "gpt-4"
-                
-                Log.d("GameViewModel", "Call 2: Generative Outcome using $activeProviderId ($activeModelId)")
-                val outcomePrompt = promptFactory.createOutcomePrompt(adjudication, intent.narrationPrefix, wikiContext)
-                
-                var fullResponse = ""
-                aiRepository.streamChat(activeProviderId, activeModelId, outcomePrompt).collect { chunk ->
-                    fullResponse += chunk
-                    Log.v("GameViewModel", "Outcome chunk: $chunk")
-                    
-                    // Attempt to extract narration on the fly
-                    val narrationMatch = Regex("\"final_narration\"\\s*:\\s*\"(.*?)(?<!\\\\)\"").find(fullResponse)
-                    if (narrationMatch != null) {
-                        val currentNarration = narrationMatch.groupValues[1]
-                            .replace("\\\"", "\"")
-                            .replace("\\n", "\n")
-                        _uiState.update { it.copy(
-                            streamingMessage = ChatMessage(MessageSender.AI, currentNarration)
-                        )}
-                    } else {
-                        val partialMatch = Regex("\"final_narration\"\\s*:\\s*\"(.*)").find(fullResponse)
-                        if (partialMatch != null) {
-                            val partial = partialMatch.groupValues[1]
-                                .replace("\\\"", "\"")
-                                .replace("\\n", "\n")
-                            _uiState.update { it.copy(
-                                streamingMessage = ChatMessage(MessageSender.AI, partial)
-                            )}
-                        }
-                    }
-                }
-                
-                if (fullResponse.isEmpty()) {
-                    Log.e("GameViewModel", "Outcome response is empty!")
-                    throw Exception("Failed to generate outcome.")
-                }
-
-                Log.d("GameViewModel", "Received Outcome JSON: $fullResponse")
-                try {
-                    val sanitizedOutcome = fullResponse.trim()
-                        .removePrefix("```json")
-                        .removePrefix("```")
-                        .removeSuffix("```")
-                        .trim()
-                    val outcome = json.decodeFromString<GenerativeOutcomeResponse>(sanitizedOutcome)
-                    val finalMsg = ChatMessage(MessageSender.AI, outcome.finalNarration)
-                    _uiState.update { state ->
-                        state.copy(
-                            chatMessages = state.chatMessages + finalMsg,
-                            streamingMessage = null,
-                            availableChoices = outcome.uiChoices,
-                            diceResult = null,
-                            kineticEffect = when (outcome.hapticTrigger) {
-                                "bounce" -> KineticEffect.HeavyThud
-                                "expand" -> KineticEffect.SuccessCrescendo
-                                "wobble" -> KineticEffect.StatusWobble
-                                else -> null
-                            }
-                        )
-                    }
-                    persistChatMessage(finalMsg)
-                    stateMachine?.processEvent(GameEvent.OutcomeGenerated)
-                    checkChronicler()
-                } catch (e: Exception) {
-                    Log.e("GameViewModel", "JSON Parsing Error: ${e.message}")
-                    val fallbackMsg = ChatMessage(MessageSender.AI, fullResponse)
-                     _uiState.update { it.copy(
-                        chatMessages = it.chatMessages + fallbackMsg,
-                        streamingMessage = null
-                    )}
-                    persistChatMessage(fallbackMsg)
-                    stateMachine?.processEvent(GameEvent.OutcomeGenerated)
-                    checkChronicler()
-                }
-
             } catch (e: Exception) {
-                Log.e("GameViewModel", "Two-Call Cycle Error", e)
-                stateMachine?.processEvent(GameEvent.ErrorOccurred)
-                _uiState.update { it.copy(error = e.message) }
+                Log.e("GameViewModel", "Intent extraction failed", e)
+                _uiState.update { it.copy(
+                    uiStatus = GameUiStatus.AwaitingInput,
+                    error = "The DM is having trouble understanding. (${e.localizedMessage})"
+                ) }
             }
         }
     }
 
-    private fun checkChronicler() {
-        turnCount++
-        if (turnCount >= 5) {
-            turnCount = 0
-            viewModelScope.launch {
-                val currentMessages = _uiState.value.chatMessages
-                stateMachine?.processEvent(GameEvent.ChronicleTriggered)
-                _uiState.update { it.copy(kineticEffect = KineticEffect.GlitchUpdate) }
-                chronicler.chronicleSession(currentMessages)
-                stateMachine?.processEvent(GameEvent.OutcomeGenerated)
-            }
+    fun onUndo() {
+        viewModelScope.launch {
+            encounterStateMachine.stateMachine.processEvent(EncounterEvent.RollbackRequested)
         }
     }
 
     fun onEffectConsumed() {
         _uiState.update { it.copy(kineticEffect = null) }
-    }
-
-    private fun detectEntities(text: String): List<String> {
-        // Simple regex to find capitalized words (Named Entities)
-        val regex = Regex("\\b[A-Z][a-z]+\\b")
-        return regex.findAll(text).map { it.value }.distinct().toList()
-    }
-
-    private suspend fun adjudicate(intent: IntentDeductionResponse): AdjudicationResult {
-        val character = _uiState.value.character!!
-        return when (intent.mechanicType) {
-            "attack_roll" -> {
-                val mod = when(intent.statRequired) {
-                    "str" -> character.strengthModifier
-                    "dex" -> character.dexterityModifier
-                    else -> character.strengthModifier
-                }
-                val (hit, roll) = combatEngine.resolveAttack(intent.difficultyClass ?: 10, mod + character.proficiencyBonus)
-                if (hit) {
-                    val damage = combatEngine.calculateDamage("1d8", mod)
-                    if (intent.targetId == "player") {
-                        val updatedChar = combatEngine.applyDamage(character, damage.total)
-                        gameRepository.updateCharacter(updatedChar)
-                        _uiState.update { it.copy(character = updatedChar) }
-                    }
-                    AdjudicationResult.Hit(damage.total, "wounded", roll.total)
-                } else {
-                    AdjudicationResult.Miss(roll.total)
-                }
-            }
-            "saving_throw" -> {
-                val mod = when(intent.statRequired) {
-                    "str" -> character.strengthModifier
-                    "dex" -> character.dexterityModifier
-                    "con" -> character.constitutionModifier
-                    "int" -> character.intelligenceModifier
-                    "wis" -> character.wisdomModifier
-                    "cha" -> character.charismaModifier
-                    else -> 0
-                }
-                val (success, roll) = combatEngine.resolveSavingThrow(intent.difficultyClass ?: 10, mod + character.proficiencyBonus)
-                if (success) {
-                    AdjudicationResult.Success(roll.total, intent.difficultyClass ?: 10)
-                } else {
-                    val damage = combatEngine.calculateDamage("1d6", 0)
-                    val updatedChar = combatEngine.applyDamage(character, damage.total)
-                    gameRepository.updateCharacter(updatedChar)
-                    _uiState.update { it.copy(character = updatedChar) }
-                    AdjudicationResult.Failure(roll.total, intent.difficultyClass ?: 10)
-                }
-            }
-            "skill_check" -> {
-                 val mod = when(intent.statRequired) {
-                    "str" -> character.strengthModifier
-                    "dex" -> character.dexterityModifier
-                    "int" -> character.intelligenceModifier
-                    "wis" -> character.wisdomModifier
-                    "cha" -> character.charismaModifier
-                    else -> 0
-                }
-                val roll = diceEngine.roll(DiceRoll(1, 20, mod))
-                val dc = intent.difficultyClass ?: 10
-                if (roll.total >= dc) AdjudicationResult.Success(roll.total, dc) 
-                else AdjudicationResult.Failure(roll.total, dc)
-            }
-            else -> {
-                Log.d("GameViewModel", "Adjudication: None (Type: ${intent.mechanicType})")
-                AdjudicationResult.None
-            }
-        }
     }
 }

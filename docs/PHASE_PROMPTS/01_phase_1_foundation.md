@@ -1,11 +1,12 @@
-Execute Phase 1: Foundation & Data Layer.
+# Phase 1: Project Setup and Foundational Data Layer
 
-1. Update the app and project-level build.gradle.kts files to include the necessary dependencies for Dagger Hilt, Room Persistence Library, kotlinx.serialization, KStateMachine, and Ktor Client.
-2. Create the core:database package structure.
-3. Define the Room Database schema, including:
-   - CharacterEntity for player stats and HP.
-   - MemoryEntity for the Chronicler's narrative updates.
-   - SrdReferenceEntity to house machine-readable D&D rules.
-4. Set up Dagger Hilt modules to provide the Database and local Repository instances.
+## User Prompt
+create a plan to implement this plan in phases. follow the github workflow to plan the commit. plan to stop after each phase and wait for permission to continue.
 
-Ensure CharacterEntity only stores raw integers for stats (1-30). Modifiers must be implemented as computed getters as specified in wiki/srd_character_creation.md. Keep your generated files modular and atomic. Stop and confirm when the project compiles and the Room schema is verified.
+## Plan Context
+Implement the complete, production-ready, and flawless Kotlin codebase for a hybrid AI-adjudicated Dungeons & Dragons simulator. This application relies on a strictly defined "Two-Call Cycle" to prevent Generative AI hallucinations and ensure perfect mathematical determinism. The architecture is composed of Phase A (Intent Deduction via AI), Phase B (Local Adjudication via pure Kotlin), and Phase C (Generative Outcome via AI).
+
+Phase 1 focus: Setup dependencies and define the core Room schema for spatial tracking and snapshots.
+- [NEW] EntityNode.kt: Represents characters, monsters, and environmental hazards on a 5ft grid.
+- [NEW] TurnStateSnapshot.kt: Stores a JSON-serialized snapshot of the encounter for rollbacks.
+- [NEW] EntityNodeDao.kt: Includes the circular AoE Euclidean distance query.

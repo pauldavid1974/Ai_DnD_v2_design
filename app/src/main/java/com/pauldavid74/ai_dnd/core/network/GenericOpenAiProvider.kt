@@ -51,23 +51,6 @@ class GenericOpenAiProvider(
         Log.d("GenericOpenAiProvider", "[$id] Streaming chat from: $url")
 
         try {
-            // First perform a HEAD or minimal GET to check for 403/401 before SSE
-            val checkResponse: HttpResponse = httpClient.post(url) {
-                header(HttpHeaders.Authorization, "Bearer $apiKey")
-                contentType(ContentType.Application.Json)
-                setBody(OpenAiChatRequest(
-                    model = modelId,
-                    messages = listOf(ChatMessage("user", "test")),
-                    stream = false // Non-streaming check
-                ))
-            }
-
-            if (checkResponse.status != HttpStatusCode.OK) {
-                val errorBody = checkResponse.bodyAsText()
-                Log.e("GenericOpenAiProvider", "[$id] Auth/Request error: ${checkResponse.status}. Body: $errorBody")
-                throw Exception("API Error (${checkResponse.status}): $errorBody")
-            }
-
             httpClient.serverSentEvents(
                 urlString = url,
                 request = {
