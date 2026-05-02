@@ -1,9 +1,11 @@
 package com.pauldavid74.ai_dnd.feature.game
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -118,9 +120,9 @@ fun GameScreen(
                     .padding(padding)
                     .fillMaxSize()
                     .shakeOnEffect(state.kineticEffect)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                contentPadding = PaddingValues(vertical = 16.dp),
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
             ) {
                 itemsIndexed(state.chatMessages) { index, message ->
                     when (message.sender) {
@@ -174,6 +176,12 @@ fun GameScreen(
         state.character?.let { char ->
             SemanticVignette(currentHp = char.currentHp, maxHp = char.maxHp)
         }
+
+        // Dice roll overlay
+        DiceRollChip(
+            result = state.diceResult,
+            modifier = Modifier.align(Alignment.Center)
+        )
 
         // Chronicler glitch — fullscreen, topmost
         if (state.uiStatus == GameUiStatus.Chronicling) {
@@ -242,17 +250,18 @@ private fun GameInputBar(
     onChipClick: (String) -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.background,
-        tonalElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
         ) {
-            // Action dropdown (from AI response)
-            ActionDropdown(
+            // Action drawer (from AI response)
+            ActionBottomDrawer(
                 choices = choices,
                 enabled = isEnabled,
                 onChoice = onChipClick,
@@ -260,8 +269,8 @@ private fun GameInputBar(
 
             // Text input row
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 OutlinedTextField(
                     value = inputText,
@@ -272,38 +281,34 @@ private fun GameInputBar(
                         Text(
                             text = "What do you do?",
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 fontStyle = FontStyle.Italic,
                             ),
                         )
                     },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
+                    textStyle = MaterialTheme.typography.bodyLarge,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                         cursorColor = MaterialTheme.colorScheme.primary,
-                        disabledBorderColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
-                    shape = MaterialTheme.shapes.medium,
-                    singleLine = false,
-                    maxLines = 4,
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 5,
                 )
 
                 FilledIconButton(
                     onClick = onSend,
                     enabled = isEnabled && inputText.isNotBlank(),
+                    modifier = Modifier.size(52.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send",
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }

@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -48,18 +50,27 @@ fun NarrationBlock(
         }
     }
 
+    val paragraphs = remember(text) { text.split("\n\n").filter { it.isNotBlank() } }
+    val letterSpacing = with(androidx.compose.ui.platform.LocalDensity.current) { 0.5.dp.toSp() }
+
     Column(
         modifier = modifier
-            .padding(horizontal = 4.dp, vertical = 8.dp)
-            .graphicsLayer(alpha = alpha.value)
+            .padding(horizontal = 4.dp, vertical = 12.dp)
+            .graphicsLayer(alpha = alpha.value),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = text + if (isStreaming) "▌" else "",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onBackground,
-                fontStyle = FontStyle.Normal,
-            ),
-        )
+        paragraphs.forEachIndexed { index, paragraph ->
+            val isLast = index == paragraphs.size - 1
+            Text(
+                text = paragraph + if (isStreaming && isLast) "▌" else "",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontStyle = FontStyle.Normal,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f,
+                    letterSpacing = letterSpacing
+                ),
+            )
+        }
     }
 }
 
@@ -69,19 +80,21 @@ fun NarrationBlock(
 @Composable
 fun PlayerInputBlock(text: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.End,
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 4.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 2.dp
         ) {
             Text(
                 text = text,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.Medium
                 ),
             )
         }
@@ -184,86 +197,149 @@ fun DiceRollChip(result: String?, modifier: Modifier = Modifier) {
     }
 }
 
-// ── ActionDropdown ─────────────────────────────────────────────────────────────
-// Redesigned: A clear button that opens a vertical menu of suggested actions.
+// ── ActionBottomDrawer ────────────────────────────────────────────────────────
+// Matches the reference: A header that expands into a list of actions.
 
 @Composable
-fun ActionDropdown(
+fun ActionBottomDrawer(
     choices: List<UiChoice>,
     enabled: Boolean,
     onChoice: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (choices.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.padding(bottom = 8.dp)) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            enabled = enabled,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary
-            )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    ) {
+        // Drawer Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled && choices.isNotEmpty()) { expanded = !expanded }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.List,
+                imageVector = Icons.Default.Close, // Using Close/X as cross-swords placeholder
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Suggested Actions",
-                style = MaterialTheme.typography.labelLarge
+                text = "Actions",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = CircleShape
+            ) {
+                Text(
+                    text = "${choices.size}",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        // Expanded Action List
+        AnimatedVisibility(
+            visible = expanded && choices.isNotEmpty(),
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
-            choices.forEach { choice ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = choice.label,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = iconForChoice(choice),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    onClick = {
-                        onChoice(choice.label)
-                        expanded = false
-                    },
-                    colors = MenuDefaults.itemColors(
-                        textColor = MaterialTheme.colorScheme.onSurface,
-                        leadingIconColor = MaterialTheme.colorScheme.primary
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                choices.forEach { choice ->
+                    ActionItemRow(
+                        choice = choice,
+                        onClick = {
+                            onChoice(choice.label)
+                            expanded = false
+                        }
                     )
-                )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 48.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                }
+                // Hardcoded "Something else..." if desired, or handled by AI
             }
         }
+    }
+}
+
+@Composable
+private fun ActionItemRow(
+    choice: UiChoice,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = iconForChoice(choice),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(
+            text = choice.label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowRight,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
     }
 }
 
 private fun iconForChoice(choice: UiChoice): ImageVector {
     val combined = (choice.label + " " + choice.actionType).lowercase()
     return when {
-        combined.containsAny("attack", "fight", "strike", "slash", "shoot") -> Icons.Default.Warning
-        combined.containsAny("search", "look", "investig", "percep", "inspect", "scan") -> Icons.Default.Search
-        combined.containsAny("talk", "persuad", "deceiv", "social", "speak", "ask", "charm") -> Icons.Default.MailOutline
-        combined.containsAny("spell", "cast", "magic", "ritual") -> Icons.Default.Star
-        combined.containsAny("run", "dash", "flee", "escape", "retreat") -> Icons.Default.Refresh
-        combined.containsAny("sneak", "hide", "stealth") -> Icons.Default.VisibilityOff
+        combined.containsAny("attack", "fight", "strike", "slash", "shoot", "hit", "kill") -> Icons.Default.Gavel
+        combined.containsAny("search", "look", "investig", "percep", "inspect", "scan", "find", "examine") -> Icons.Default.Search
+        combined.containsAny("talk", "persuad", "deceiv", "social", "speak", "ask", "charm", "intimidate", "greet") -> Icons.Default.QuestionAnswer
+        combined.containsAny("spell", "cast", "magic", "ritual", "arcane", "bless") -> Icons.Default.AutoAwesome
+        combined.containsAny("run", "dash", "flee", "escape", "retreat", "travel", "go to", "walk") -> Icons.Default.DirectionsRun
+        combined.containsAny("sneak", "hide", "stealth", "pickpocket") -> Icons.Default.VisibilityOff
+        combined.containsAny("rest", "sleep", "camp", "heal", "potion") -> Icons.Default.Favorite
         else -> Icons.Default.Edit
     }
 }
