@@ -4,18 +4,25 @@ import com.pauldavid74.ai_dnd.core.network.model.MeleeAttackIntent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import ru.nsk.kstatemachine.state.*
-import ru.nsk.kstatemachine.statemachine.*
+import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepository
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import ru.nsk.kstatemachine.event.Event
+import ru.nsk.kstatemachine.state.*
+import ru.nsk.kstatemachine.statemachine.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EncounterStateMachineTest {
+    private val actionValidator = mockk<ActionValidator>(relaxed = true)
+    private val resourceValidator = mockk<ResourceValidator>(relaxed = true)
+    private val snapshotRepository = mockk<SnapshotRepository>(relaxed = true)
 
     @Test
     fun `test state transitions`() = runTest {
-        val encounterStateMachine = EncounterStateMachine(this)
+        val encounterStateMachine = EncounterStateMachine(
+            this, actionValidator, resourceValidator, snapshotRepository
+        )
         encounterStateMachine.start()
         val machine = encounterStateMachine.stateMachine
 
@@ -30,6 +37,9 @@ class EncounterStateMachineTest {
         // Trigger Intent
         val intent = MeleeAttackIntent("sword", "enemy1")
         machine.processEvent(EncounterEvent.IntentEvent(intent))
+        
+        // Wait for validation to finish (since it launches a coroutine)
+        machine.processEvent(EncounterEvent.ValidationPassedEvent(intent))
         
         assertTrue(machine.activeStates().any { it.name == "ActionResolution" })
 

@@ -3,11 +3,13 @@ package com.pauldavid74.ai_dnd.core.database.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Represents a spatial node in the combat encounter.
  * This is the source of truth for all mathematical adjudication in Phase B.
  */
+@Serializable
 @Entity(
     tableName = "entity_nodes",
     indices = [

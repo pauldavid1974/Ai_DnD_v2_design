@@ -1,24 +1,32 @@
 package com.pauldavid74.ai_dnd.core.rules
 
+import com.pauldavid74.ai_dnd.core.data.repository.SnapshotRepository
 import com.pauldavid74.ai_dnd.core.network.model.PlayerIntent
 import kotlinx.coroutines.CoroutineScope
-import ru.nsk.kstatemachine.event.DataEvent
+import kotlinx.coroutines.launch
 import ru.nsk.kstatemachine.event.Event
 import ru.nsk.kstatemachine.state.*
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStateMachine
+import ru.nsk.kstatemachine.transition.TransitionParams
 
 sealed interface EncounterEvent : Event {
     object StartEncounter : EncounterEvent
     object NextRound : EncounterEvent
     object NextTurn : EncounterEvent
-    data class IntentEvent(override val data: PlayerIntent) : DataEvent<PlayerIntent>, EncounterEvent
+    data class IntentEvent(val data: PlayerIntent) : EncounterEvent
+    data class ValidationPassedEvent(val data: PlayerIntent) : EncounterEvent
+    data class ErrorEvent(val reason: String) : EncounterEvent
     object ActionResolved : EncounterEvent
     object EncounterEnded : EncounterEvent
+    object RollbackRequested : EncounterEvent
 }
 
 class EncounterStateMachine(
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val actionValidator: ActionValidator,
+    private val resourceValidator: ResourceValidator,
+    private val snapshotRepository: SnapshotRepository
 ) {
     lateinit var stateMachine: StateMachine
 
@@ -26,29 +34,59 @@ class EncounterStateMachine(
         stateMachine = createStateMachine(scope, "EncounterStateMachine") {
             logger = StateMachine.Logger { println(it) }
 
-            // Using standard state for now due to DataState compatibility issues in this version
-            // We will manually extract the intent data in the transition
-            val resolutionState = state("ActionResolution")
-
+            // Defining states
             val encounterState = state("CombatEncounter") {
                 val roundState = state("CombatRound") {
                     val turnState = state("EntityTurn") {
                         onEntry {
                             println("Entering EntityTurn")
+                            snapshotRepository.takeSnapshot()
                         }
                     }
                     setInitialState(turnState)
-
+                    
                     transition<EncounterEvent.NextTurn>(targetState = turnState)
                 }
                 setInitialState(roundState)
-
+                
                 transition<EncounterEvent.NextRound>(targetState = roundState)
             }
 
-            // Transition from EntityTurn to ActionResolution
             val turnState = encounterState.findState("CombatRound")!!.findState("EntityTurn")!! as State
-            turnState.transition<EncounterEvent.IntentEvent>(targetState = resolutionState)
+            val resolutionState = state("ActionResolution")
+            val bounceState = state("BounceState")
+
+            val validationState = state("ValidationState") {
+                onEntry { params ->
+                    val event = params.event as? EncounterEvent.IntentEvent
+                    if (event == null) {
+                        this@createStateMachine.processEvent(EncounterEvent.ErrorEvent("No intent found"))
+                        return@onEntry
+                    }
+                    
+                    val intent = event.data
+                    val actorId = "player1" // Simplified
+                    
+                    this@EncounterStateMachine.scope.launch {
+                        if (!resourceValidator.canAfford(actorId, intent)) {
+                            this@createStateMachine.processEvent(EncounterEvent.ErrorEvent("Insufficient resources"))
+                            return@launch
+                        }
+
+                        val validation = actionValidator.validate(actorId, intent)
+                        if (validation is ValidationResult.Success) {
+                            this@createStateMachine.processEvent(EncounterEvent.ValidationPassedEvent(intent))
+                        } else {
+                            this@createStateMachine.processEvent(EncounterEvent.ErrorEvent((validation as ValidationResult.Failure).reason))
+                        }
+                    }
+                }
+
+                transition<EncounterEvent.ValidationPassedEvent>(targetState = resolutionState)
+                transition<EncounterEvent.ErrorEvent>(targetState = bounceState)
+            }
+
+            turnState.transition<EncounterEvent.IntentEvent>(targetState = validationState)
 
             resolutionState.apply {
                 onEntry {
@@ -59,7 +97,15 @@ class EncounterStateMachine(
                 }
             }
 
+            bounceState.onEntry {
+                println("Bouncing impossible action")
+            }
+
             setInitialState(encounterState)
+
+            encounterState.transition<EncounterEvent.RollbackRequested> {
+                // Simplified rollback trigger
+            }
 
             val endState = finalState("End")
             transition<EncounterEvent.EncounterEnded>(targetState = endState)
