@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.AiProviderRepository
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 import com.pauldavid74.ai_dnd.core.security.KeyManager
+import com.pauldavid74.ai_dnd.core.database.entity.ChatMessageEntity
 import com.pauldavid74.ai_dnd.core.domain.factory.AdjudicationResult
 import com.pauldavid74.ai_dnd.core.domain.factory.Chronicler
 import com.pauldavid74.ai_dnd.core.domain.factory.PromptFactory
@@ -72,6 +73,7 @@ class GameViewModel @Inject constructor(
             content = "DICE_ROLL:$resultString"
         )
         _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+        persistChatMessage(chatRollMessage)
     }
 
     init {
@@ -126,7 +128,14 @@ class GameViewModel @Inject constructor(
             val character = gameRepository.getCharacter(characterId)
             _uiState.update { it.copy(character = character) }
             
-            if (_uiState.value.chatMessages.isEmpty()) {
+            // Restore chat history
+            val savedMessages = gameRepository.getChatMessages(characterId).first()
+            if (savedMessages.isNotEmpty()) {
+                val chatMessages = savedMessages.map { entity ->
+                    ChatMessage(entity.sender, entity.content, entity.timestamp)
+                }
+                _uiState.update { it.copy(chatMessages = chatMessages) }
+            } else {
                 startAdventure(character!!)
             }
         }
@@ -148,13 +157,15 @@ class GameViewModel @Inject constructor(
                     )}
                 }
                 
+                val finalIntro = ChatMessage(MessageSender.AI, introText)
                 _uiState.update { state ->
                     state.copy(
-                        chatMessages = state.chatMessages + ChatMessage(MessageSender.AI, introText),
+                        chatMessages = state.chatMessages + finalIntro,
                         streamingMessage = null,
                         uiStatus = GameUiStatus.AwaitingInput
                     )
                 }
+                persistChatMessage(finalIntro)
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Error starting adventure", e)
                 _uiState.update { it.copy(uiStatus = GameUiStatus.AwaitingInput, error = "Failed to start adventure: ${e.message}") }
@@ -162,14 +173,30 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    private fun persistChatMessage(message: ChatMessage) {
+        val characterId = _uiState.value.character?.id ?: return
+        viewModelScope.launch {
+            gameRepository.saveChatMessage(
+                ChatMessageEntity(
+                    characterId = characterId,
+                    sender = message.sender,
+                    content = message.content,
+                    timestamp = message.timestamp
+                )
+            )
+        }
+    }
+
     fun onSendMessage(text: String) {
         if (text.isBlank() || _uiState.value.uiStatus != GameUiStatus.AwaitingInput) return
 
+        val userMsg = ChatMessage(MessageSender.USER, text)
         _uiState.update { state ->
             state.copy(
-                chatMessages = state.chatMessages + ChatMessage(MessageSender.USER, text)
+                chatMessages = state.chatMessages + userMsg
             )
         }
+        persistChatMessage(userMsg)
         
         viewModelScope.launch {
             stateMachine?.processEvent(GameEvent.SendMessage(text))
@@ -242,6 +269,7 @@ class GameViewModel @Inject constructor(
                         content = "DICE_ROLL:$summary"
                     )
                     _uiState.update { it.copy(chatMessages = it.chatMessages + chatRollMessage) }
+                    persistChatMessage(chatRollMessage)
                 }
 
                 // Wiki Lookups
@@ -303,9 +331,10 @@ class GameViewModel @Inject constructor(
                         .removeSuffix("```")
                         .trim()
                     val outcome = json.decodeFromString<GenerativeOutcomeResponse>(sanitizedOutcome)
+                    val finalMsg = ChatMessage(MessageSender.AI, outcome.finalNarration)
                     _uiState.update { state ->
                         state.copy(
-                            chatMessages = state.chatMessages + ChatMessage(MessageSender.AI, outcome.finalNarration),
+                            chatMessages = state.chatMessages + finalMsg,
                             streamingMessage = null,
                             availableChoices = outcome.uiChoices,
                             diceResult = null,
@@ -317,14 +346,17 @@ class GameViewModel @Inject constructor(
                             }
                         )
                     }
+                    persistChatMessage(finalMsg)
                     stateMachine?.processEvent(GameEvent.OutcomeGenerated)
                     checkChronicler()
                 } catch (e: Exception) {
                     Log.e("GameViewModel", "JSON Parsing Error: ${e.message}")
+                    val fallbackMsg = ChatMessage(MessageSender.AI, fullResponse)
                      _uiState.update { it.copy(
-                        chatMessages = it.chatMessages + ChatMessage(MessageSender.AI, fullResponse),
+                        chatMessages = it.chatMessages + fallbackMsg,
                         streamingMessage = null
                     )}
+                    persistChatMessage(fallbackMsg)
                     stateMachine?.processEvent(GameEvent.OutcomeGenerated)
                     checkChronicler()
                 }

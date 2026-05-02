@@ -2,6 +2,7 @@ package com.pauldavid74.ai_dnd.core.data.repository
 
 import com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity
 import com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity
+import com.pauldavid74.ai_dnd.core.database.entity.ChatMessageEntity
 import com.pauldavid74.ai_dnd.core.database.entity.FrontEntity
 import com.pauldavid74.ai_dnd.core.database.entity.MemoryEntity
 import com.pauldavid74.ai_dnd.core.database.entity.ScenarioEdgeEntity
@@ -16,6 +17,11 @@ interface GameRepository {
     suspend fun saveCharacter(character: CharacterEntity): Long
     suspend fun updateCharacter(character: CharacterEntity)
     suspend fun deleteCharacter(character: CharacterEntity)
+
+    // Chat
+    fun getChatMessages(characterId: Long): Flow<List<ChatMessageEntity>>
+    suspend fun saveChatMessage(message: ChatMessageEntity)
+    suspend fun deleteChatHistory(characterId: Long)
 
     // Memory
     fun getAllMemories(): Flow<List<MemoryEntity>>

@@ -2,11 +2,13 @@ package com.pauldavid74.ai_dnd.core.data.repository
 
 import com.pauldavid74.ai_dnd.core.database.dao.CampaignDao
 import com.pauldavid74.ai_dnd.core.database.dao.CharacterDao
+import com.pauldavid74.ai_dnd.core.database.dao.ChatMessageDao
 import com.pauldavid74.ai_dnd.core.database.dao.MemoryDao
 import com.pauldavid74.ai_dnd.core.database.dao.ScenarioDao
 import com.pauldavid74.ai_dnd.core.database.dao.SrdReferenceDao
 import com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity
 import com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity
+import com.pauldavid74.ai_dnd.core.database.entity.ChatMessageEntity
 import com.pauldavid74.ai_dnd.core.database.entity.FrontEntity
 import com.pauldavid74.ai_dnd.core.database.entity.MemoryEntity
 import com.pauldavid74.ai_dnd.core.database.entity.ScenarioEdgeEntity
@@ -19,6 +21,7 @@ import javax.inject.Singleton
 @Singleton
 class GameRepositoryImpl @Inject constructor(
     private val characterDao: CharacterDao,
+    private val chatMessageDao: ChatMessageDao,
     private val memoryDao: MemoryDao,
     private val srdReferenceDao: SrdReferenceDao,
     private val scenarioDao: ScenarioDao,
@@ -34,6 +37,15 @@ class GameRepositoryImpl @Inject constructor(
     override suspend fun updateCharacter(character: CharacterEntity) = characterDao.updateCharacter(character)
 
     override suspend fun deleteCharacter(character: CharacterEntity) = characterDao.deleteCharacter(character)
+
+    override fun getChatMessages(characterId: Long): Flow<List<ChatMessageEntity>> = 
+        chatMessageDao.getMessagesForCharacter(characterId)
+
+    override suspend fun saveChatMessage(message: ChatMessageEntity) = 
+        chatMessageDao.insertMessage(message)
+
+    override suspend fun deleteChatHistory(characterId: Long) = 
+        chatMessageDao.deleteMessagesForCharacter(characterId)
 
     override fun getAllMemories(): Flow<List<MemoryEntity>> = memoryDao.getAllMemories()
 

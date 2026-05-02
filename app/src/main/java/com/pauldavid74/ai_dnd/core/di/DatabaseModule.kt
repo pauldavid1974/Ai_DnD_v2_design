@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.pauldavid74.ai_dnd.core.database.AppDatabase
 import com.pauldavid74.ai_dnd.core.database.dao.CampaignDao
 import com.pauldavid74.ai_dnd.core.database.dao.CharacterDao
+import com.pauldavid74.ai_dnd.core.database.dao.ChatMessageDao
 import com.pauldavid74.ai_dnd.core.database.dao.MemoryDao
 import com.pauldavid74.ai_dnd.core.database.dao.ScenarioDao
 import com.pauldavid74.ai_dnd.core.database.dao.SrdReferenceDao
@@ -32,6 +33,11 @@ object DatabaseModule {
     @Provides
     fun provideCharacterDao(database: AppDatabase): CharacterDao {
         return database.characterDao()
+    }
+
+    @Provides
+    fun provideChatMessageDao(database: AppDatabase): ChatMessageDao {
+        return database.chatMessageDao()
     }
 
     @Provides

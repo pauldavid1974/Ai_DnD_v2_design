@@ -5,31 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="74dad374-bc2b-4d13-b6a7-bf529c271cb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/rules/CharacterSheetManager.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/PHASE_PROMPTS/02_ui_integration.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/dao/ChatMessageDao.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/entity/ChatMessageEntity.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/executionHistory/executionHistory.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/9.4.1/fileHashes/resourceHashesCache.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/outputFiles.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/outputFiles.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/file-system.probe" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/planningMode.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/planningMode.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/GameRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/GameRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/GameRepositoryImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/data/repository/GameRepositoryImpl.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/AppDatabase.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/AppDatabase.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/entity/CharacterEntity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/database/entity/CharacterEntity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/security/KeyManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/security/KeyManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/theme/Color.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/theme/Color.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/theme/Type.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/ui/theme/Type.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/di/DatabaseModule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/core/di/DatabaseModule.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/GameViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/charactersheet/CharacterSheetScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/game/charactersheet/CharacterSheetScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/home/HomeScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationState.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/pauldavid74/ai_dnd/feature/pregame/character/CharacterCreationViewModel.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,7 +87,7 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "feat/srd-521-character-sheet",
+    "git-widget-placeholder": "feat/progress-saving",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/pdo74/AI_DND_V2",
     "settings.editor.selected.configurable": "templates.modelproviders.configurable"
