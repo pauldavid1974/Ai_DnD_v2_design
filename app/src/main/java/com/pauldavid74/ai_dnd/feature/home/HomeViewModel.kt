@@ -3,6 +3,7 @@ package com.pauldavid74.ai_dnd.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
+import com.pauldavid74.ai_dnd.core.security.KeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -10,7 +11,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: GameRepository
+    private val repository: GameRepository,
+    private val keyManager: KeyManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeState())
@@ -26,7 +28,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun loadData() {
+    fun loadData() {
         viewModelScope.launch {
             combine(
                 repository.getAllCampaigns(),
@@ -35,7 +37,8 @@ class HomeViewModel @Inject constructor(
                 HomeState(
                     recentCampaigns = campaigns,
                     characters = characters,
-                    isLoading = false
+                    isLoading = false,
+                    isApiKeyMissing = !keyManager.hasAnyValidKey()
                 )
             }.collect { newState ->
                 _uiState.value = newState

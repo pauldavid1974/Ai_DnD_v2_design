@@ -46,6 +46,10 @@ class CharacterCreationViewModel @Inject constructor(
         _uiState.update { it.copy(alignment = alignment) }
     }
 
+    fun onInventoryChanged(inventory: List<String>) {
+        _uiState.update { it.copy(inventory = inventory) }
+    }
+
     fun onMethodChanged(method: GenerationMethod) {
         _uiState.update { state ->
             if (method == GenerationMethod.STANDARD_ARRAY) {
@@ -155,7 +159,8 @@ class CharacterCreationViewModel @Inject constructor(
                     wisdom = state.wisdom,
                     charisma = state.charisma,
                     currentHp = maxHp,
-                    maxHp = maxHp
+                    maxHp = maxHp,
+                    inventory = state.inventory
                 )
                 Log.d("CharacterCreation", "Saving character: $character")
                 val newId = repository.saveCharacter(character)

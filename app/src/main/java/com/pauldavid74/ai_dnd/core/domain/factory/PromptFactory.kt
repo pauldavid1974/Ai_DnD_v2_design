@@ -20,9 +20,15 @@ class PromptFactory @Inject constructor(
             SYSTEM: You are a D&D 5.2.1 Dungeon Master. 
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
+            - Inventory: ${character.inventory.joinToString(", ").ifBlank { "Nothing but the clothes on their back" }}
             
-            TASK: Provide a brief, atmospheric opening narration for a new adventure. Set the scene and end with a prompt for the player to act.
-            Output ONLY the narration text.
+            TASK: Provide a concrete, grounded opening narration for the START of a new adventure. 
+            - Describe the immediate surroundings with physical detail (sight, sound, smell).
+            - Establish a clear location and situation.
+            - Avoid flowery, vague atmospheric prose; focus on substance.
+            - End with a prompt for the player to act.
+            
+            IMPORTANT: Output ONLY the narration text. Do not invent items not in the inventory.
         """.trimIndent()
     }
 
@@ -50,6 +56,7 @@ class PromptFactory @Inject constructor(
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
             - Status: ${hpBucket.name.lowercase()}
+            - Inventory: ${character.inventory.joinToString(", ").ifBlank { "Nothing" }}
             - Recent Plot: ${lastSummary ?: "Just starting the adventure."}
             $memoryContext
             $frontContext
@@ -59,12 +66,12 @@ class PromptFactory @Inject constructor(
             
             USER INPUT: "$userInput"
             
-            TASK: Deduce the player's intent and output the Intent Deduction JSON Schema.
+            TASK: Deduce the player's intent. 
             - mechanic_type: one of [skill_check, attack_roll, saving_throw, none]
             - stat_required: one of [str, dex, con, int, wis, cha]
-            - narration_prefix: Atmospheric prose describing the *attempt* before the dice hit the table. NEVER narrate the outcome.
+            - narration_prefix: Grounded prose describing the *attempt*. Focus on the physical action and the immediate environment. Do not use flowery language. NEVER narrate the outcome.
             
-            IMPORTANT: Output ONLY valid JSON. Do not include any other text or explanation.
+            IMPORTANT: Output ONLY valid, raw JSON. Do NOT use markdown code blocks (e.g., no ```json). Do not include any other text. Do not hallucinate equipment.
         """.trimIndent()
     }
 
@@ -73,20 +80,24 @@ class PromptFactory @Inject constructor(
         narrationPrefix: String,
         wikiContext: String? = null
     ): String {
+        val isSuccess = adjudication is AdjudicationResult.Success || adjudication is AdjudicationResult.Hit || adjudication is AdjudicationResult.None
+        val details = if (adjudication is AdjudicationResult.None) "No check required. Proceed with successful narration." else adjudication.getSummary()
+        
         return """
             SYSTEM: The deterministic dice have rolled. 
             PREVIOUS ATTEMPT: $narrationPrefix
             
             ADJUDICATION RESULT:
-            - Success: ${adjudication is AdjudicationResult.Success || adjudication is AdjudicationResult.Hit || adjudication is AdjudicationResult.None}
-            - Details: ${if (adjudication is AdjudicationResult.None) "No check required. Proceed with narration." else adjudication.getSummary()}
+            - Success: $isSuccess
+            - Details: $details
             ${if (wikiContext != null) "\nSRD RULES REFERENCE:\n$wikiContext" else ""}
             
-            TASK: Narrate the physical impact and final outcome of this action using the Generative Outcome JSON Schema.
-            - final_narration: Visceral, atmospheric prose describing the physical impact.
+            TASK: Narrate the physical impact and final outcome.
+            - final_narration: Visceral, grounded prose. Describe the physical consequences and changes to the environment using sight, sound, and touch. 
+            - Avoid flowery language, vague metaphors, or atmospheric filler. Be specific and concrete.
             - haptic_trigger: one of [resist, expand, bounce, wobble]
             
-            IMPORTANT: Output ONLY valid JSON. Do not include any other text or explanation.
+            IMPORTANT: Output ONLY valid, raw JSON. Do NOT use markdown code blocks (e.g., no ```json). Do not include any other text.
         """.trimIndent()
     }
 }

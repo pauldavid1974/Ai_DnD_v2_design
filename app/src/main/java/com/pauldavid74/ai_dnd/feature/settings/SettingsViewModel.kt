@@ -3,6 +3,7 @@ package com.pauldavid74.ai_dnd.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pauldavid74.ai_dnd.core.data.repository.AiProviderRepository
+import com.pauldavid74.ai_dnd.core.network.model.LLMProvider
 import com.pauldavid74.ai_dnd.core.security.KeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,87 +23,116 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsState> = _uiState.asStateFlow()
 
     init {
-        _uiState.update { state ->
-            val activeProvider = keyManager.getActiveProvider()
+        val activeProviderId = keyManager.getActiveProvider() ?: ""
+        val allProviderIds = LLMProvider.ALL_PROVIDERS.map { it.id }
+        
+        val initialKeys = allProviderIds.associateWith { keyManager.getApiKey(it) ?: "" }
+        val initialUrls = allProviderIds.associateWith { keyManager.getCustomBaseUrl(it) ?: "" }
+        val initialSelectedModels = allProviderIds.associateWith { keyManager.getActiveModel(it) ?: "" }
+        val initialSavedProviders = allProviderIds.filter { keyManager.getApiKey(it) != null }.toSet()
+
+        _uiState.update { it.copy(
+            providerKeys = initialKeys,
+            providerUrls = initialUrls,
+            selectedProviderId = activeProviderId,
+            selectedModels = initialSelectedModels,
+            savedProviders = initialSavedProviders,
+            isModelSaved = allProviderIds.associateWith { (keyManager.getActiveModel(it) ?: "").isNotEmpty() }
+        ) }
+    }
+
+    fun onKeyChanged(key: String) {
+        val providerId = _uiState.value.selectedProviderId
+        _uiState.update { state -> 
             state.copy(
-                openAiKey = keyManager.getApiKey(KeyManager.PROVIDER_OPENAI) ?: "",
-                anthropicKey = keyManager.getApiKey(KeyManager.PROVIDER_ANTHROPIC) ?: "",
-                groqKey = keyManager.getApiKey(KeyManager.PROVIDER_GROQ) ?: "",
-                selectedProviderId = activeProvider,
-                selectedModelId = keyManager.getActiveModel(activeProvider) ?: ""
+                providerKeys = state.providerKeys + (providerId to key),
+                verificationResults = state.verificationResults + (providerId to null),
+                savedProviders = state.savedProviders - providerId
+            ) 
+        }
+    }
+
+    fun onUrlChanged(url: String) {
+        val providerId = _uiState.value.selectedProviderId
+        _uiState.update { state ->
+            state.copy(
+                providerUrls = state.providerUrls + (providerId to url),
+                savedProviders = state.savedProviders - providerId // Re-verify if URL changes
             )
         }
-        fetchModels()
-    }
-
-    fun onOpenAiKeyChanged(key: String) {
-        _uiState.update { it.copy(openAiKey = key, isSaved = false) }
-    }
-
-    fun onAnthropicKeyChanged(key: String) {
-        _uiState.update { it.copy(anthropicKey = key, isSaved = false) }
-    }
-
-    fun onGroqKeyChanged(key: String) {
-        _uiState.update { it.copy(groqKey = key, isSaved = false) }
-    }
-
-    fun saveKeys() {
-        val state = _uiState.value
-        keyManager.saveApiKey(KeyManager.PROVIDER_OPENAI, state.openAiKey)
-        keyManager.saveApiKey(KeyManager.PROVIDER_ANTHROPIC, state.anthropicKey)
-        keyManager.saveApiKey(KeyManager.PROVIDER_GROQ, state.groqKey)
-        _uiState.update { it.copy(isSaved = true) }
-        fetchModels()
     }
 
     fun onProviderSelected(providerId: String) {
         _uiState.update { it.copy(selectedProviderId = providerId) }
-        keyManager.saveActiveProvider(providerId)
-        
-        // Try to restore last selected model for this provider
-        val lastModelId = keyManager.getActiveModel(providerId)
-        if (lastModelId != null) {
-            _uiState.update { it.copy(selectedModelId = lastModelId) }
-        }
-        
-        fetchModels()
     }
 
     fun onModelSelected(modelId: String) {
-        _uiState.update { it.copy(selectedModelId = modelId) }
-        keyManager.saveActiveModel(_uiState.value.selectedProviderId, modelId)
+        val providerId = _uiState.value.selectedProviderId
+        _uiState.update { state ->
+            state.copy(
+                selectedModels = state.selectedModels + (providerId to modelId),
+                isModelSaved = state.isModelSaved + (providerId to false)
+            )
+        }
     }
 
-    private fun fetchModels() {
-        val providerId = _uiState.value.selectedProviderId
-        if (!aiRepository.hasKey(providerId)) return
+    fun saveModel() {
+        val state = _uiState.value
+        val modelId = state.currentSelectedModel
+        keyManager.saveActiveModel(state.selectedProviderId, modelId)
+        keyManager.saveActiveProvider(state.selectedProviderId)
+        _uiState.update { it.copy(
+            isModelSaved = it.isModelSaved + (state.selectedProviderId to true)
+        ) }
+    }
 
+    fun verifyKeyAndFetchModels(apiKey: String) {
+        val state = _uiState.value
+        val providerId = state.selectedProviderId
+        val customUrl = state.providerUrls[providerId]
+        
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingModels = true, error = null) }
+            _uiState.update { it.copy(isVerifying = true) }
+            _uiState.update { it.copy(verificationResults = it.verificationResults + (providerId to null)) }
+            
             try {
-                val models = aiRepository.getAvailableModels(providerId)
-                val currentSelectedModelId = _uiState.value.selectedModelId
+                keyManager.saveApiKey(providerId, apiKey)
+                if (!customUrl.isNullOrBlank()) {
+                    keyManager.saveCustomBaseUrl(providerId, customUrl)
+                }
                 
-                // If current model is not in the new list, or if we didn't have a model selected,
-                // pick the first one. Otherwise keep the restored one.
-                val modelToSelect = if (models.any { it.id == currentSelectedModelId }) {
-                    currentSelectedModelId
-                } else {
-                    val firstModelId = models.firstOrNull()?.id ?: ""
-                    if (firstModelId.isNotEmpty()) {
-                        keyManager.saveActiveModel(providerId, firstModelId)
-                    }
-                    firstModelId
+                // Note: The current AiProviderRepository implementation might need updates 
+                // to handle these new providers and custom URLs. 
+                // For now, we attempt to fetch using the existing infrastructure.
+                val models = aiRepository.getAvailableModels(providerId)
+                
+                val filteredModels = models.filter { model ->
+                    val id = model.id.lowercase()
+                    id.contains("gpt") || id.contains("claude") || id.contains("llama") || 
+                    id.contains("mistral") || id.contains("gemini") || id.contains("deepseek") ||
+                    id.contains("qwen") || id.contains("phi") || id.contains("gemma")
                 }
 
-                _uiState.update { it.copy(
-                    availableModels = models,
-                    selectedModelId = modelToSelect,
-                    isLoadingModels = false
-                ) }
+                // If filter was too aggressive, show all models as fallback
+                val finalModels = if (filteredModels.isEmpty()) models else filteredModels
+
+                _uiState.update { s ->
+                    s.copy(
+                        isVerifying = false,
+                        verificationResults = s.verificationResults + (providerId to VerificationResult.Success),
+                        availableModels = s.availableModels + (providerId to finalModels),
+                        savedProviders = s.savedProviders + providerId
+                    )
+                }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoadingModels = false, error = "Failed to fetch models: ${e.message}") }
+                keyManager.deleteApiKey(providerId)
+                _uiState.update { s ->
+                    s.copy(
+                        isVerifying = false,
+                        verificationResults = s.verificationResults + (providerId to VerificationResult.Failure(e.message ?: "Connection failed")),
+                        savedProviders = s.savedProviders - providerId
+                    )
+                }
             }
         }
     }

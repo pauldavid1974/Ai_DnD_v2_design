@@ -129,6 +129,7 @@ fun CharacterCreationScreen(
                             viewModel.onBackgroundChanged(archetype.background)
                             viewModel.onOriginFeatChanged(archetype.originFeat)
                             viewModel.onAlignmentChanged(archetype.alignment)
+                            viewModel.onInventoryChanged(archetype.inventory)
                             archetype.applyStats(viewModel)
                         },
                         onNameChanged = viewModel::onNameChanged,
@@ -449,6 +450,7 @@ data class Archetype(
     val background: String = "Heroic Artisan",
     val originFeat: String = "Tough",
     val alignment: String = "Neutral",
+    val inventory: List<String> = emptyList(),
     val role: String,
     val icon: String,
     val defaultName: String,
@@ -468,18 +470,18 @@ data class Archetype(
 }
 
 val ARCHETYPES = listOf(
-    Archetype("Steel Knight",    "Fighter",   "Human",      "Soldier",           "Tough",    "Neutral Good", "Frontline tank",       "⚔",  "Aldric",   15, 13, 14, 8,  12, 10, 10),
-    Archetype("Shadow Blade",    "Rogue",     "Elf",        "Criminal",          "Alert",    "Chaotic Neutral","Stealth skirmisher", "🗡",  "Sable",    10, 15, 14, 13, 12, 8,  8),
-    Archetype("Spell Scholar",   "Wizard",    "Gnome",      "Sage",              "Skilled",  "Neutral",      "Ranged nuker",         "📖", "Elara",    8,  14, 13, 15, 12, 10, 6),
-    Archetype("Dawn Shepherd",   "Cleric",    "Halfling",   "Acolyte",           "Magic Initiate", "Lawful Good",  "Healer / support", "☀",  "Mira",     13, 10, 14, 12, 15, 8,  8),
-    Archetype("Wild Tracker",    "Ranger",    "Elf",        "Outlander",         "Alert",    "Neutral Good", "Ranged skirmisher",    "🏹", "Fenris",   13, 15, 12, 10, 14, 8,  10),
-    Archetype("Storm Berserker", "Barbarian", "Goliath",    "Hermit",            "Tough",    "Chaotic Good", "Pure bruiser",         "🌩", "Grak",     15, 13, 14, 8,  12, 10, 12),
-    Archetype("Silver-Tongue",   "Bard",      "Human",      "Entertainer",       "Skilled",  "Chaotic Good", "Face / utility",       "🎭", "Vesper",   8,  14, 12, 13, 10, 15, 8),
-    Archetype("Dragon-Blooded",  "Sorcerer",  "Dragonborn", "Noble",             "Magic Initiate", "Neutral",      "Burst caster",   "🐉", "Skarrex",  8,  14, 13, 12, 10, 15, 6),
-    Archetype("Fiend-Pact",      "Warlock",   "Tiefling",   "Charlatan",         "Skilled",  "Chaotic Evil", "Mid-range caster",     "🔥", "Mordecai", 8,  14, 13, 12, 10, 15, 8),
-    Archetype("Moon Druid",      "Druid",     "Elf",        "Hermit",            "Magic Initiate", "Neutral",      "Versatile caster", "🌙", "Sylva",    10, 13, 14, 12, 15, 8,  8),
-    Archetype("Open Hand",       "Monk",      "Human",      "Acolyte",           "Tough",    "Lawful Neutral","Mobile striker",      "🥋", "Tenzin",   13, 15, 14, 10, 12, 8,  8),
-    Archetype("Oath Knight",     "Paladin",   "Dwarf",      "Noble",             "Tough",    "Lawful Good",  "Tank / smiter",        "🛡",  "Vayne",    15, 10, 13, 8,  12, 14, 10),
+    Archetype("Steel Knight",    "Fighter",   "Human",      "Soldier",           "Tough",    "Neutral Good", listOf("Chain Mail", "Longsword", "Shield"), "Frontline tank",       "⚔",  "Aldric",   15, 13, 14, 8,  12, 10, 10),
+    Archetype("Shadow Blade",    "Rogue",     "Elf",        "Criminal",          "Alert",    "Chaotic Neutral", listOf("Leather Armor", "Shortsword", "Thieves' Tools"), "Stealth skirmisher", "🗡",  "Sable",    10, 15, 14, 13, 12, 8,  8),
+    Archetype("Spell Scholar",   "Wizard",    "Gnome",      "Sage",              "Skilled",  "Neutral",      listOf("Scholar's Pack", "Arcane Focus", "Spellbook"), "Ranged nuker",         "📖", "Elara",    8,  14, 13, 15, 12, 10, 6),
+    Archetype("Dawn Shepherd",   "Cleric",    "Halfling",   "Acolyte",           "Magic Initiate", "Lawful Good",  listOf("Scale Mail", "Mace", "Holy Symbol"), "Healer / support",     "☀",  "Mira",     13, 10, 14, 12, 15, 8,  8),
+    Archetype("Wild Tracker",    "Ranger",    "Elf",        "Outlander",         "Alert",    "Neutral Good", listOf("Scale Mail", "Longbow", "Shortswords"), "Ranged skirmisher",    "🏹", "Fenris",   13, 15, 12, 10, 14, 8,  10),
+    Archetype("Storm Berserker", "Barbarian", "Goliath",    "Hermit",            "Tough",    "Chaotic Good", listOf("Greataxe", "Javelins", "Explorer's Pack"), "Pure bruiser",         "🌩", "Grak",     15, 13, 14, 8,  12, 10, 12),
+    Archetype("Silver-Tongue",   "Bard",      "Human",      "Entertainer",       "Skilled",  "Chaotic Good", listOf("Leather Armor", "Rapier", "Lute"), "Face / utility",       "🎭", "Vesper",   8,  14, 12, 13, 10, 15, 8),
+    Archetype("Dragon-Blooded",  "Sorcerer",  "Dragonborn", "Noble",             "Magic Initiate", "Neutral",      listOf("Dagger", "Component Pouch", "Arcane Focus"), "Burst caster",         "🐉", "Skarrex",  8,  14, 13, 12, 10, 15, 6),
+    Archetype("Fiend-Pact",      "Warlock",   "Tiefling",   "Charlatan",         "Skilled",  "Chaotic Evil", listOf("Leather Armor", "Dagger", "Arcane Focus"), "Mid-range caster",     "🔥", "Mordecai", 8,  14, 13, 12, 10, 15, 8),
+    Archetype("Moon Druid",      "Druid",     "Elf",        "Hermit",            "Magic Initiate", "Neutral",      listOf("Leather Armor", "Quarterstaff", "Druidic Focus"), "Versatile caster",     "🌙", "Sylva",    10, 13, 14, 12, 15, 8,  8),
+    Archetype("Open Hand",       "Monk",      "Human",      "Acolyte",           "Tough",    "Lawful Neutral", listOf("Quarterstaff", "Darts (10)"), "Mobile striker",       "🥋", "Tenzin",   13, 15, 14, 10, 12, 8,  8),
+    Archetype("Oath Knight",     "Paladin",   "Dwarf",      "Noble",             "Tough",    "Lawful Good",  listOf("Chain Mail", "Warhammer", "Shield"), "Tank / smiter",        "🛡",  "Vayne",    15, 10, 13, 8,  12, 14, 10),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

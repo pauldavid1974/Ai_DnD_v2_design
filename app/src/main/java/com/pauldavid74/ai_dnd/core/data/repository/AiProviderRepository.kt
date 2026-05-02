@@ -2,10 +2,14 @@ package com.pauldavid74.ai_dnd.core.data.repository
 
 import android.util.Log
 import com.pauldavid74.ai_dnd.core.network.AiProvider
+import com.pauldavid74.ai_dnd.core.network.GenericOpenAiProvider
 import com.pauldavid74.ai_dnd.core.network.model.AiModel
+import com.pauldavid74.ai_dnd.core.network.model.LLMProvider
 import com.pauldavid74.ai_dnd.core.security.KeyManager
+import io.ktor.client.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,11 +23,13 @@ interface AiProviderRepository {
 @Singleton
 class AiProviderRepositoryImpl @Inject constructor(
     private val providers: Set<@JvmSuppressWildcards AiProvider>,
-    private val keyManager: KeyManager
+    private val keyManager: KeyManager,
+    private val httpClient: HttpClient,
+    private val json: Json
 ) : AiProviderRepository {
 
     override suspend fun getAvailableModels(providerId: String): List<AiModel> {
-        val provider = providers.find { it.id == providerId }
+        val provider = getProvider(providerId)
         val apiKey = keyManager.getApiKey(providerId)
         return if (provider != null && apiKey != null) {
             provider.getAvailableModels(apiKey)
@@ -33,22 +39,28 @@ class AiProviderRepositoryImpl @Inject constructor(
     }
 
     override suspend fun streamChat(providerId: String, modelId: String, prompt: String): Flow<String> {
-        val provider = providers.find { it.id == providerId }
+        val provider = getProvider(providerId)
         val apiKey = keyManager.getApiKey(providerId)
         
         Log.d("AiProviderRepository", "streaming chat for $providerId with model $modelId")
-        if (apiKey.isNullOrBlank()) {
-            Log.e("AiProviderRepository", "No API key found for $providerId!")
-        }
-        if (provider == null) {
-            Log.e("AiProviderRepository", "Provider $providerId not found in set!")
-        }
-
+        
         return if (provider != null && !apiKey.isNullOrBlank()) {
             provider.streamChat(apiKey, modelId, prompt)
         } else {
             emptyFlow()
         }
+    }
+
+    private fun getProvider(providerId: String): AiProvider? {
+        val registered = providers.find { it.id == providerId }
+        if (registered != null) return registered
+
+        val config = LLMProvider.ALL_PROVIDERS.find { it.id == providerId }
+        val baseUrl = keyManager.getCustomBaseUrl(providerId) ?: config?.baseUrl
+        
+        return if (!baseUrl.isNullOrBlank()) {
+            GenericOpenAiProvider(providerId, baseUrl, httpClient, json)
+        } else null
     }
 
     override fun hasKey(providerId: String): Boolean {
@@ -57,7 +69,8 @@ class AiProviderRepositoryImpl @Inject constructor(
 
     override suspend fun validateKey(providerId: String): Boolean {
         return try {
-            getAvailableModels(providerId).isNotEmpty()
+            val models = getAvailableModels(providerId)
+            models.isNotEmpty()
         } catch (e: Exception) {
             false
         }

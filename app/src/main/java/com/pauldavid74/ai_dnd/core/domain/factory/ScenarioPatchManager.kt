@@ -35,7 +35,7 @@ class ScenarioPatchManager @Inject constructor(
     }
 
     private suspend fun requestPatch(graph: ScenarioGraph, errors: List<String>): ScenarioGraph {
-        val providerId = keyManager.getActiveProvider()
+        val providerId = keyManager.getActiveProvider() ?: "openai"
         val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
 
         val prompt = """

@@ -1,158 +1,206 @@
 package com.pauldavid74.ai_dnd.feature.settings
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.pauldavid74.ai_dnd.core.security.KeyManager
+import com.pauldavid74.ai_dnd.core.network.model.AiModel
+import com.pauldavid74.ai_dnd.core.network.model.LLMProvider
+import com.pauldavid74.ai_dnd.core.ui.theme.Ember
+import com.pauldavid74.ai_dnd.core.ui.theme.Moss
+import com.pauldavid74.ai_dnd.core.ui.theme.Wine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToHome: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(state.isSaved) {
-        if (state.isSaved) {
-            snackbarHostState.showSnackbar("API Keys saved securely")
-        }
-    }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("AI Configuration") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                )
             )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 20.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text(
-                "AI Configuration",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Text(
-                "API Keys are stored locally using Android EncryptedSharedPreferences.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.height(8.dp))
 
-            KeyField(
-                label = "OpenAI API Key",
-                value = state.openAiKey,
-                onValueChange = viewModel::onOpenAiKeyChanged
-            )
-
-            KeyField(
-                label = "Anthropic API Key",
-                value = state.anthropicKey,
-                onValueChange = viewModel::onAnthropicKeyChanged
-            )
-
-            KeyField(
-                label = "Groq API Key",
-                value = state.groqKey,
-                onValueChange = viewModel::onGroqKeyChanged
-            )
-
-            Button(
-                onClick = viewModel::saveKeys,
-                modifier = Modifier.fillMaxWidth()
+            // Step 1: Select Provider
+            SetupStep(
+                number = 1,
+                title = "Choose AI Provider",
+                isComplete = state.selectedProviderId.isNotEmpty()
             ) {
-                Text("Save Keys")
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                "Model Selection",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-
-            ProviderDropdown(
-                selectedProviderId = state.selectedProviderId,
-                onSelect = viewModel::onProviderSelected
-            )
-
-            if (state.isLoadingModels) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            } else if (state.availableModels.isNotEmpty()) {
-                ModelDropdown(
-                    selectedModelId = state.selectedModelId,
-                    models = state.availableModels,
-                    onSelect = viewModel::onModelSelected
-                )
-            } else {
-                Text(
-                    "No models found. Ensure your API key is saved and valid.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                ProviderDropdown(
+                    selectedId = state.selectedProviderId,
+                    onSelect = viewModel::onProviderSelected
                 )
             }
 
-            if (state.error != null) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
+            // Step 2: API Key
+            AnimatedVisibility(visible = state.selectedProviderId.isNotEmpty()) {
+                SetupStep(
+                    number = 2,
+                    title = "Verify API Key",
+                    isComplete = state.isCurrentKeySaved
+                ) {
+                    KeyVerificationSection(
+                        provider = state.currentProvider,
+                        currentKey = state.currentKey,
+                        currentUrl = state.currentUrl,
+                        isVerifying = state.isVerifying,
+                        isSaved = state.isCurrentKeySaved,
+                        result = state.currentVerificationResult,
+                        onKeyChange = viewModel::onKeyChanged,
+                        onUrlChange = viewModel::onUrlChanged,
+                        onVerify = viewModel::verifyKeyAndFetchModels
+                    )
+                }
             }
+
+            // Step 3: Choose Model
+            AnimatedVisibility(visible = state.isCurrentKeySaved) {
+                SetupStep(
+                    number = 3,
+                    title = "Select Chat Model",
+                    isComplete = state.isCurrentModelSaved
+                ) {
+                    ModelSelectionSection(
+                        selectedId = state.currentSelectedModel,
+                        models = state.currentModels,
+                        isSaved = state.isCurrentModelSaved,
+                        onSelect = viewModel::onModelSelected,
+                        onSave = viewModel::saveModel
+                    )
+                }
+            }
+
+            // Final Step: Start Adventure
+            AnimatedVisibility(visible = state.isCurrentModelSaved) {
+                Button(
+                    onClick = onNavigateToHome,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.PlayArrow, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ready for Adventure", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun SetupStep(
+    number: Int,
+    title: String,
+    isComplete: Boolean,
+    content: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Surface(
+                shape = CircleShape,
+                color = if (isComplete) Moss else MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (isComplete) {
+                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    } else {
+                        Text(number.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+        }
+        
+        Box(modifier = Modifier.padding(start = 40.dp)) {
+            content()
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProviderDropdown(selectedProviderId: String, onSelect: (String) -> Unit) {
-    val providers = listOf(
-        KeyManager.PROVIDER_OPENAI,
-        KeyManager.PROVIDER_ANTHROPIC,
-        KeyManager.PROVIDER_GROQ
-    )
+private fun ProviderDropdown(selectedId: String, onSelect: (String) -> Unit) {
+    val providers = LLMProvider.ALL_PROVIDERS
     var expanded by remember { mutableStateOf(false) }
+    val currentProvider = providers.find { it.id == selectedId }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedProviderId.uppercase(),
+            value = currentProvider?.name ?: "Select a Provider",
             onValueChange = {},
             readOnly = true,
             label = { Text("Active Provider") },
+            leadingIcon = { 
+                if (currentProvider != null) {
+                    Icon(currentProvider.icon, null, tint = MaterialTheme.colorScheme.primary) 
+                } else {
+                    Icon(Icons.Default.CloudQueue, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
         )
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            providers.forEach { providerId ->
+            providers.forEach { provider ->
                 DropdownMenuItem(
-                    text = { Text(providerId.uppercase()) },
+                    text = {
+                        Column {
+                            Text(provider.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(provider.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    leadingIcon = { Icon(provider.icon, null) },
                     onClick = {
-                        onSelect(providerId)
+                        onSelect(provider.id)
                         expanded = false
                     }
                 )
@@ -161,22 +209,142 @@ fun ProviderDropdown(selectedProviderId: String, onSelect: (String) -> Unit) {
     }
 }
 
+@Composable
+private fun KeyVerificationSection(
+    provider: LLMProvider?,
+    currentKey: String,
+    currentUrl: String,
+    isVerifying: Boolean,
+    isSaved: Boolean,
+    result: VerificationResult?,
+    onKeyChange: (String) -> Unit,
+    onUrlChange: (String) -> Unit,
+    onVerify: (String) -> Unit
+) {
+    if (provider == null) return
+    var showKey by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (provider.isCustom) {
+            OutlinedTextField(
+                value = currentUrl,
+                onValueChange = onUrlChange,
+                label = { Text("Custom Base URL (e.g. http://localhost:1234/v1)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
+
+        OutlinedTextField(
+            value = currentKey,
+            onValueChange = onKeyChange,
+            label = { Text("${provider.name} API Key") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showKey) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showKey = !showKey }) {
+                    Icon(if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, null)
+                }
+            },
+            shape = RoundedCornerShape(8.dp)
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AnimatedContent(targetState = isSaved, label = "verify_btn") { saved ->
+                if (saved) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.VpnKey, null, tint = Moss, modifier = Modifier.size(20.dp))
+                        Text("Key Saved", color = Moss, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
+                } else if (currentKey.isNotBlank() && (!provider.isCustom || currentUrl.isNotBlank())) {
+                    Button(
+                        onClick = { onVerify(currentKey) },
+                        enabled = !isVerifying,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        if (isVerifying) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text("Verify & Save Key")
+                        }
+                    }
+                }
+            }
+
+            if (!isSaved && result is VerificationResult.Failure) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Default.Error, null, tint = Wine, modifier = Modifier.size(20.dp))
+                    Text("Fail", color = Wine, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+        
+        if (!isSaved && result is VerificationResult.Failure) {
+            Text(result.message, style = MaterialTheme.typography.labelSmall, color = Wine)
+        }
+    }
+}
+
+@Composable
+private fun ModelSelectionSection(
+    selectedId: String,
+    models: List<AiModel>,
+    isSaved: Boolean,
+    onSelect: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (models.isEmpty()) {
+            Text("No chat models found. You can still enter a model name manually below.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            OutlinedTextField(
+                value = selectedId,
+                onValueChange = onSelect,
+                label = { Text("Model ID") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        } else {
+            ModelDropdown(selectedModelId = selectedId, models = models, onSelect = onSelect)
+        }
+            
+        AnimatedContent(targetState = isSaved, label = "save_btn") { saved ->
+            if (saved) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Default.BookmarkAdded, null, tint = Moss, modifier = Modifier.size(20.dp))
+                    Text("Model Active", color = Moss, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                }
+            } else if (selectedId.isNotBlank()) {
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Ember)
+                ) {
+                    Text("Set as Active Model")
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelDropdown(selectedModelId: String, models: List<com.pauldavid74.ai_dnd.core.network.model.AiModel>, onSelect: (String) -> Unit) {
+private fun ModelDropdown(selectedModelId: String, models: List<AiModel>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val currentModel = models.find { it.id == selectedModelId }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedModelId,
+            value = currentModel?.name ?: selectedModelId.ifBlank { "Select a Model" },
             onValueChange = {},
             readOnly = true,
             label = { Text("Active Model") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -193,16 +361,4 @@ fun ModelDropdown(selectedModelId: String, models: List<com.pauldavid74.ai_dnd.c
             }
         }
     }
-}
-
-@Composable
-fun KeyField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        visualTransformation = PasswordVisualTransformation(),
-        singleLine = true
-    )
 }

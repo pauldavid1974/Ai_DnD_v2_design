@@ -145,7 +145,7 @@ class GameViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(uiStatus = GameUiStatus.GeneratingOutcome) }
-                val providerId = keyManager.getActiveProvider()
+                val providerId = keyManager.getActiveProvider() ?: "openai"
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
                 val introPrompt = promptFactory.createIntroPrompt(character)
                 
@@ -219,7 +219,7 @@ class GameViewModel @Inject constructor(
                     .map { Pair(it.getOrNull(0)?.content ?: "", it.getOrNull(1)?.content ?: "") }
 
                 // Call 1: Intent Deduction
-                val providerId = keyManager.getActiveProvider()
+                val providerId = keyManager.getActiveProvider() ?: "openai"
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
                 
                 Log.d("GameViewModel", "Call 1: Intent Deduction using $providerId ($modelId)")
@@ -285,7 +285,7 @@ class GameViewModel @Inject constructor(
                 stateMachine?.processEvent(GameEvent.MathAdjudicated)
                 
                 // Call 2: Generative Outcome
-                val activeProviderId = keyManager.getActiveProvider()
+                val activeProviderId = keyManager.getActiveProvider() ?: "openai"
                 val activeModelId = keyManager.getActiveModel(activeProviderId) ?: "gpt-4"
                 
                 Log.d("GameViewModel", "Call 2: Generative Outcome using $activeProviderId ($activeModelId)")

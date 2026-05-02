@@ -7,6 +7,7 @@ data class CharacterCreationState(
     val background: String = "",
     val originFeat: String = "",
     val alignment: String = "",
+    val inventory: List<String> = emptyList(),
     val strength: Int = 8,
     val dexterity: Int = 8,
     val constitution: Int = 8,

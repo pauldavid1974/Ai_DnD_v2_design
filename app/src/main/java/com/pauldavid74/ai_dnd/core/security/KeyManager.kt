@@ -3,6 +3,7 @@ package com.pauldavid74.ai_dnd.core.security
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.pauldavid74.ai_dnd.core.network.model.LLMProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,10 +55,10 @@ class KeyManager @Inject constructor(
     }
 
     /**
-     * Retrieves the currently selected provider ID.
+     * Retrieves the currently selected provider ID. Returns null if none set.
      */
-    fun getActiveProvider(): String {
-        return sharedPreferences.getString(KEY_ACTIVE_PROVIDER, PROVIDER_OPENAI) ?: PROVIDER_OPENAI
+    fun getActiveProvider(): String? {
+        return sharedPreferences.getString(KEY_ACTIVE_PROVIDER, null)
     }
 
     /**
@@ -79,6 +80,29 @@ class KeyManager @Inject constructor(
      */
     fun deleteApiKey(provider: String) {
         sharedPreferences.edit().remove(provider).apply()
+    }
+
+    /**
+     * Saves a custom base URL for a specific provider.
+     */
+    fun saveCustomBaseUrl(provider: String, url: String) {
+        sharedPreferences.edit().putString("base_url_$provider", url).apply()
+    }
+
+    /**
+     * Retrieves the custom base URL for a specific provider.
+     */
+    fun getCustomBaseUrl(provider: String): String? {
+        return sharedPreferences.getString("base_url_$provider", null)
+    }
+
+    /**
+     * Checks if any valid API key is currently stored across all providers.
+     */
+    fun hasAnyValidKey(): Boolean {
+        return LLMProvider.ALL_PROVIDERS.any { provider ->
+            getApiKey(provider.id) != null
+        }
     }
 
     companion object {
