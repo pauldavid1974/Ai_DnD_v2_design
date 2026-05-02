@@ -6,6 +6,7 @@ import com.pauldavid74.ai_dnd.core.database.AppDatabase
 import com.pauldavid74.ai_dnd.core.database.dao.CampaignDao
 import com.pauldavid74.ai_dnd.core.database.dao.CharacterDao
 import com.pauldavid74.ai_dnd.core.database.dao.ChatMessageDao
+import com.pauldavid74.ai_dnd.core.database.dao.EntityNodeDao
 import com.pauldavid74.ai_dnd.core.database.dao.MemoryDao
 import com.pauldavid74.ai_dnd.core.database.dao.ScenarioDao
 import com.pauldavid74.ai_dnd.core.database.dao.SrdReferenceDao
@@ -58,5 +59,10 @@ object DatabaseModule {
     @Provides
     fun provideCampaignDao(database: AppDatabase): CampaignDao {
         return database.campaignDao()
+    }
+
+    @Provides
+    fun provideEntityNodeDao(database: AppDatabase): EntityNodeDao {
+        return database.entityNodeDao()
     }
 }
