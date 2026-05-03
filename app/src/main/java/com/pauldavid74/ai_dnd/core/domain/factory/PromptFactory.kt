@@ -29,9 +29,14 @@ class PromptFactory @Inject constructor(
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
             - Inventory: ${character.inventory.joinToString(", ")}
+            - KNOWN SPELLS: ${character.spells.joinToString(", ")}
             $campaignContext
             
-            TASK: Provide a concrete, grounded opening narration for the START of this adventure.
+            TASK: Provide a concrete, grounded opening narration for the START of this adventure. 
+            
+            RULES:
+            - Provide 2-3 logical next steps as "ui_choices".
+            - IMPORTANT: You can ONLY suggest spells as "ui_choices" if they are in the KNOWN SPELLS list above.
             
             JSON SCHEMA:
             {
@@ -112,6 +117,7 @@ class PromptFactory @Inject constructor(
     }
 
     fun createOutcomePrompt(
+        character: CharacterEntity,
         adjudication: AdjudicationResult,
         narrationPrefix: String,
         chatHistory: List<Pair<String, String>>,
@@ -125,6 +131,10 @@ class PromptFactory @Inject constructor(
 
         return """
             SYSTEM: The deterministic dice have rolled. 
+            CONTEXT:
+            - Player: ${character.name} (Level ${character.level} ${character.characterClass})
+            - KNOWN SPELLS: ${character.spells.joinToString(", ")}
+            
             PREVIOUS ATTEMPT: $narrationPrefix
             $historyContext
             
@@ -148,6 +158,7 @@ class PromptFactory @Inject constructor(
             RULES:
             - Ensure the narration follows the PREVIOUS ATTEMPT and RECENT CONVERSATION.
             - Provide 2-3 logical next steps as "ui_choices".
+            - IMPORTANT: You can ONLY suggest spells as "ui_choices" if they are in the KNOWN SPELLS list above.
             - final_narration should be specific and concrete. Avoid flowery language.
             - Output ONLY the raw JSON. Do NOT include markdown code blocks.
         """.trimIndent()

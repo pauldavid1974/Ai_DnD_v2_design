@@ -149,6 +149,7 @@ class GameViewModel @Inject constructor(
                     .map { (if (it.sender == MessageSender.USER) "User" else "AI") to it.content }
 
                 val outcomePrompt = promptFactory.createOutcomePrompt(
+                    character = currentState.character,
                     adjudication = encounterStateMachine.latestAdjudication,
                     narrationPrefix = prefix,
                     chatHistory = historyPairs,

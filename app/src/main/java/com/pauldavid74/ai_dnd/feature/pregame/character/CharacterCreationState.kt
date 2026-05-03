@@ -8,6 +8,7 @@ data class CharacterCreationState(
     val originFeat: String = "",
     val alignment: String = "",
     val inventory: List<String> = emptyList(),
+    val spells: List<String> = emptyList(),
     val strength: Int = 8,
     val dexterity: Int = 8,
     val constitution: Int = 8,

@@ -2,16 +2,22 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "59e50c057190f64e7090476b27f3c730",
+    "identityHash": "aabc8b73ff0d50bfeedf6210b00e3426",
     "entities": [
       {
         "tableName": "characters",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `species` TEXT NOT NULL, `characterClass` TEXT NOT NULL, `background` TEXT NOT NULL, `originFeat` TEXT NOT NULL, `alignment` TEXT NOT NULL, `level` INTEGER NOT NULL, `experiencePoints` INTEGER NOT NULL, `strength` INTEGER NOT NULL, `dexterity` INTEGER NOT NULL, `constitution` INTEGER NOT NULL, `intelligence` INTEGER NOT NULL, `wisdom` INTEGER NOT NULL, `charisma` INTEGER NOT NULL, `currentHp` INTEGER NOT NULL, `maxHp` INTEGER NOT NULL, `temporaryHp` INTEGER NOT NULL, `deathSaveSuccesses` INTEGER NOT NULL, `deathSaveFailures` INTEGER NOT NULL, `classFeatures` TEXT NOT NULL, `spells` TEXT NOT NULL, `inventory` TEXT NOT NULL, `weaponMasteries` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `campaignId` TEXT NOT NULL, `name` TEXT NOT NULL, `species` TEXT NOT NULL, `characterClass` TEXT NOT NULL, `background` TEXT NOT NULL, `originFeat` TEXT NOT NULL, `alignment` TEXT NOT NULL, `level` INTEGER NOT NULL, `experiencePoints` INTEGER NOT NULL, `strength` INTEGER NOT NULL, `dexterity` INTEGER NOT NULL, `constitution` INTEGER NOT NULL, `intelligence` INTEGER NOT NULL, `wisdom` INTEGER NOT NULL, `charisma` INTEGER NOT NULL, `currentHp` INTEGER NOT NULL, `maxHp` INTEGER NOT NULL, `temporaryHp` INTEGER NOT NULL, `deathSaveSuccesses` INTEGER NOT NULL, `deathSaveFailures` INTEGER NOT NULL, `classFeatures` TEXT NOT NULL, `spells` TEXT NOT NULL, `inventory` TEXT NOT NULL, `weaponMasteries` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "campaignId",
+            "columnName": "campaignId",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -252,7 +258,7 @@
       },
       {
         "tableName": "campaigns",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `lastPlayed` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `author` TEXT NOT NULL, `licenseType` TEXT NOT NULL, `attributionText` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `lastPlayed` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -269,6 +275,24 @@
           {
             "fieldPath": "description",
             "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "licenseType",
+            "columnName": "licenseType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attributionText",
+            "columnName": "attributionText",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -621,7 +645,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '59e50c057190f64e7090476b27f3c730')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aabc8b73ff0d50bfeedf6210b00e3426')"
     ]
   }
 }

@@ -58,6 +58,10 @@ class CharacterCreationViewModel @Inject constructor(
         _uiState.update { it.copy(inventory = inventory) }
     }
 
+    fun onSpellsChanged(spells: List<String>) {
+        _uiState.update { it.copy(spells = spells) }
+    }
+
     fun selectCampaign(campaignId: String) {
         _uiState.update { it.copy(selectedCampaignId = campaignId) }
     }
@@ -178,7 +182,8 @@ class CharacterCreationViewModel @Inject constructor(
                     charisma = state.charisma,
                     currentHp = maxHp,
                     maxHp = maxHp,
-                    inventory = state.inventory
+                    inventory = state.inventory,
+                    spells = state.spells
                 )
                 Log.d("CharacterCreation", "Saving character: $character")
                 val newId = repository.saveCharacter(character)
