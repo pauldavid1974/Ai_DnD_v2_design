@@ -16,7 +16,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CharacterCreationViewModel @Inject constructor(
-    private val repository: GameRepository
+    private val repository: GameRepository,
+    private val narrativeGenerator: com.pauldavid74.ai_dnd.core.domain.factory.NarrativeGenerator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CharacterCreationState())
@@ -60,6 +61,10 @@ class CharacterCreationViewModel @Inject constructor(
 
     fun onSpellsChanged(spells: List<String>) {
         _uiState.update { it.copy(spells = spells) }
+    }
+
+    fun onFeaturesChanged(classFeatures: List<String>, weaponMasteries: List<String>) {
+        _uiState.update { it.copy(classFeatures = classFeatures, weaponMasteries = weaponMasteries) }
     }
 
     fun selectCampaign(campaignId: String) {
@@ -135,6 +140,27 @@ class CharacterCreationViewModel @Inject constructor(
         }
     }
 
+    private fun generateNarrative(character: CharacterEntity) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingBackstory = true) }
+            var accumulated = ""
+            try {
+                narrativeGenerator.generateBackstory(character).collect { chunk ->
+                    accumulated += chunk
+                    _uiState.update { it.copy(backstory = accumulated) }
+                }
+                _uiState.update { it.copy(isGeneratingBackstory = false, isComplete = true) }
+            } catch (e: Exception) {
+                Log.e("CharacterCreation", "Narrative generation failed", e)
+                _uiState.update { it.copy(
+                    isGeneratingBackstory = false,
+                    isComplete = true,
+                    backstory = "The Chronicler's ink ran dry, but your legend begins today."
+                ) }
+            }
+        }
+    }
+
     fun saveCharacter() {
         Log.d("CharacterCreation", "saveCharacter() called. State: ${_uiState.value}")
         val state = _uiState.value
@@ -183,7 +209,9 @@ class CharacterCreationViewModel @Inject constructor(
                     currentHp = maxHp,
                     maxHp = maxHp,
                     inventory = state.inventory,
-                    spells = state.spells
+                    spells = state.spells,
+                    classFeatures = state.classFeatures,
+                    weaponMasteries = state.weaponMasteries
                 )
                 Log.d("CharacterCreation", "Saving character: $character")
                 val newId = repository.saveCharacter(character)
@@ -192,7 +220,11 @@ class CharacterCreationViewModel @Inject constructor(
                 // Initialize the scenario graph for this character/campaign (Session Zero)
                 repository.initializeScenarioForCharacter(newId, state.selectedCampaignId!!)
 
-                _uiState.update { it.copy(createdCharacterId = newId, isComplete = true, isSaving = false) }
+                _uiState.update { it.copy(createdCharacterId = newId, isSaving = false) }
+
+                // Now that math is finalized and saved, generate narrative
+                generateNarrative(character.copy(id = newId))
+
             } catch (e: Exception) {
                 Log.e("CharacterCreation", "Error saving character", e)
                 _uiState.update { it.copy(error = e.message, isSaving = false) }

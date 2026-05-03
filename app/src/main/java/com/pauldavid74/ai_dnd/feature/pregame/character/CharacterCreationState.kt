@@ -9,6 +9,8 @@ data class CharacterCreationState(
     val alignment: String = "",
     val inventory: List<String> = emptyList(),
     val spells: List<String> = emptyList(),
+    val classFeatures: List<String> = emptyList(),
+    val weaponMasteries: List<String> = emptyList(),
     val strength: Int = 8,
     val dexterity: Int = 8,
     val constitution: Int = 8,
@@ -22,6 +24,8 @@ data class CharacterCreationState(
     val error: String? = null,
     val isComplete: Boolean = false,
     val createdCharacterId: Long? = null,
+    val backstory: String = "",
+    val isGeneratingBackstory: Boolean = false,
     val availableCampaigns: List<com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity> = emptyList(),
     val selectedCampaignId: String? = null
 ) {

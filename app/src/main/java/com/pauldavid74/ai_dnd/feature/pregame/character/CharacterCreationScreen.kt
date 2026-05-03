@@ -45,112 +45,118 @@ fun CharacterCreationScreen(
     val state by viewModel.uiState.collectAsState()
     var activeTab by remember { mutableStateOf(CreationTab.QUICK_START) }
 
-    LaunchedEffect(state.isComplete) {
-        if (state.isComplete && state.createdCharacterId != null) {
-            onComplete(state.createdCharacterId!!)
-        }
-    }
+    if (state.isGeneratingBackstory || state.backstory.isNotEmpty()) {
+        BackstoryRevealScreen(
+            state = state,
+            onConfirm = { 
+                if (state.createdCharacterId != null) {
+                    onComplete(state.createdCharacterId!!)
+                }
+            }
+        )
+    } else {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "Create Your Hero",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
+                    actions = {
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                )
+            },
+        ) { padding ->
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Create Your Hero",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+            ) {
+                // ── Tab row ────────────────────────────────────────────────────────
+                TabRow(
+                    selectedTabIndex = activeTab.ordinal,
                     containerColor = MaterialTheme.colorScheme.background,
-                ),
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[activeTab.ordinal]),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                ) {
+                    Tab(
+                        selected = activeTab == CreationTab.QUICK_START,
+                        onClick = { activeTab = CreationTab.QUICK_START },
+                        text = {
+                            Text(
+                                "Quick Start",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        },
+                    )
+                    Tab(
+                        selected = activeTab == CreationTab.CUSTOM,
+                        onClick = { activeTab = CreationTab.CUSTOM },
+                        text = {
+                            Text(
+                                "Custom",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        },
+                    )
+                }
+
+                // ── Campaign Selection (Always visible, compact dropdown) ──────────────
+                CampaignSelectionSection(
+                    campaigns = state.availableCampaigns,
+                    selectedCampaignId = state.selectedCampaignId,
+                    onCampaignSelected = viewModel::selectCampaign
+                )
+
+                // ── Tab content ────────────────────────────────────────────────────
+                AnimatedContent(
+                    targetState = activeTab,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "tab_content",
+                ) { tab ->
+                    when (tab) {
+                        CreationTab.QUICK_START -> QuickStartTab(
+                            state = state,
+                            onArchetypeSelected = { archetype ->
+                                viewModel.onNameChanged(archetype.defaultName)
+                                viewModel.onClassChanged(archetype.characterClass)
+                                viewModel.onSpeciesChanged(archetype.species)
+                                viewModel.onBackgroundChanged(archetype.background)
+                                viewModel.onOriginFeatChanged(archetype.originFeat)
+                                viewModel.onAlignmentChanged(archetype.alignment)
+                                viewModel.onInventoryChanged(archetype.inventory)
+                                viewModel.onSpellsChanged(archetype.spells)
+                                viewModel.onFeaturesChanged(archetype.classFeatures, archetype.weaponMasteries)
+                                archetype.applyStats(viewModel)
+                            },
+                            onNameChanged = viewModel::onNameChanged,
+                            onConfirm = viewModel::saveCharacter,
+                        )
+                        CreationTab.CUSTOM -> CustomTab(
+                            state = state,
+                            viewModel = viewModel,
                         )
                     }
-                },
-            )
-        },
-    ) { padding ->
-
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-        ) {
-            // ── Tab row ────────────────────────────────────────────────────────
-            TabRow(
-                selectedTabIndex = activeTab.ordinal,
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[activeTab.ordinal]),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
-            ) {
-                Tab(
-                    selected = activeTab == CreationTab.QUICK_START,
-                    onClick = { activeTab = CreationTab.QUICK_START },
-                    text = {
-                        Text(
-                            "Quick Start",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    },
-                )
-                Tab(
-                    selected = activeTab == CreationTab.CUSTOM,
-                    onClick = { activeTab = CreationTab.CUSTOM },
-                    text = {
-                        Text(
-                            "Custom",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    },
-                )
-            }
-
-            // ── Campaign Selection (Always visible, more compact) ──────────────────
-            CampaignSelectionSection(
-                campaigns = state.availableCampaigns,
-                selectedCampaignId = state.selectedCampaignId,
-                onCampaignSelected = viewModel::selectCampaign
-            )
-
-            // ── Tab content ────────────────────────────────────────────────────
-            AnimatedContent(
-                targetState = activeTab,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "tab_content",
-            ) { tab ->
-                when (tab) {
-                    CreationTab.QUICK_START -> QuickStartTab(
-                        state = state,
-                        onArchetypeSelected = { archetype ->
-                            viewModel.onNameChanged(archetype.defaultName)
-                            viewModel.onClassChanged(archetype.characterClass)
-                            viewModel.onSpeciesChanged(archetype.species)
-                            viewModel.onBackgroundChanged(archetype.background)
-                            viewModel.onOriginFeatChanged(archetype.originFeat)
-                            viewModel.onAlignmentChanged(archetype.alignment)
-                            viewModel.onInventoryChanged(archetype.inventory)
-                            viewModel.onSpellsChanged(archetype.spells)
-                            archetype.applyStats(viewModel)
-                        },
-                        onNameChanged = viewModel::onNameChanged,
-                        onConfirm = viewModel::saveCharacter,
-                    )
-                    CreationTab.CUSTOM -> CustomTab(
-                        state = state,
-                        viewModel = viewModel,
-                    )
                 }
             }
         }
@@ -561,6 +567,8 @@ data class Archetype(
     val alignment: String = "Neutral",
     val inventory: List<String> = emptyList(),
     val spells: List<String> = emptyList(),
+    val classFeatures: List<String> = emptyList(),
+    val weaponMasteries: List<String> = emptyList(),
     val role: String,
     val icon: String,
     val defaultName: String,
@@ -580,18 +588,18 @@ data class Archetype(
 }
 
 val ARCHETYPES = listOf(
-    Archetype("Steel Knight",    "Fighter",   "Human",      "Soldier",           "Tough",    "Neutral Good", listOf("Chain Mail", "Longsword", "Shield"), emptyList(), "Frontline tank",       "⚔",  "Aldric",   15, 13, 14, 8,  12, 10, 10),
-    Archetype("Shadow Blade",    "Rogue",     "Elf",        "Criminal",          "Alert",    "Chaotic Neutral", listOf("Leather Armor", "Shortsword", "Thieves' Tools"), emptyList(), "Stealth skirmisher", "🗡",  "Sable",    10, 15, 14, 13, 12, 8,  8),
-    Archetype("Spell Scholar",   "Wizard",    "Gnome",      "Sage",              "Skilled",  "Neutral",      listOf("Scholar's Pack", "Arcane Focus", "Spellbook"), listOf("Magic Missile", "Shield", "Fire Bolt"), "Ranged nuker",         "📖", "Elara",    8,  14, 13, 15, 12, 10, 6),
-    Archetype("Dawn Shepherd",   "Cleric",    "Halfling",   "Acolyte",           "Magic Initiate", "Lawful Good",  listOf("Scale Mail", "Mace", "Holy Symbol"), listOf("Cure Wounds", "Bless", "Sacred Flame"), "Healer / support",     "☀",  "Mira",     13, 10, 14, 12, 15, 8,  8),
-    Archetype("Wild Tracker",    "Ranger",    "Elf",        "Outlander",         "Alert",    "Neutral Good", listOf("Scale Mail", "Longbow", "Shortswords"), emptyList(), "Ranged skirmisher",    "🏹", "Fenris",   13, 15, 12, 10, 14, 8,  10),
-    Archetype("Storm Berserker", "Barbarian", "Goliath",    "Hermit",            "Tough",    "Chaotic Good", listOf("Greataxe", "Javelins", "Explorer's Pack"), emptyList(), "Pure bruiser",         "🌩", "Grak",     15, 13, 14, 8,  12, 10, 12),
-    Archetype("Silver-Tongue",   "Bard",      "Human",      "Entertainer",       "Skilled",  "Chaotic Good", listOf("Leather Armor", "Rapier", "Lute"), listOf("Healing Word", "Dissonant Whispers", "Vicious Mockery"), "Face / utility",       "🎭", "Vesper",   8,  14, 12, 13, 10, 15, 8),
-    Archetype("Dragon-Blooded",  "Sorcerer",  "Dragonborn", "Noble",             "Magic Initiate", "Neutral",      listOf("Dagger", "Component Pouch", "Arcane Focus"), listOf("Mage Armor", "Shield", "Ray of Frost"), "Burst caster",         "🐉", "Skarrex",  8,  14, 13, 12, 10, 15, 6),
-    Archetype("Fiend-Pact",      "Warlock",   "Tiefling",   "Charlatan",         "Skilled",  "Chaotic Evil", listOf("Leather Armor", "Dagger", "Arcane Focus"), listOf("Eldritch Blast", "Hellish Rebuke", "Armor of Agathys"), "Mid-range caster",     "🔥", "Mordecai", 8,  14, 13, 12, 10, 15, 8),
-    Archetype("Moon Druid",      "Druid",     "Elf",        "Hermit",            "Magic Initiate", "Neutral",      listOf("Leather Armor", "Quarterstaff", "Druidic Focus"), listOf("Entangle", "Thunderwave", "Produce Flame"), "Versatile caster",     "🌙", "Sylva",    10, 13, 14, 12, 15, 8,  8),
-    Archetype("Open Hand",       "Monk",      "Human",      "Acolyte",           "Tough",    "Lawful Neutral", listOf("Quarterstaff", "Darts (10)"), emptyList(), "Mobile striker",       "🥋", "Tenzin",   13, 15, 14, 10, 12, 8,  8),
-    Archetype("Oath Knight",     "Paladin",   "Dwarf",      "Noble",             "Tough",    "Lawful Good",  listOf("Chain Mail", "Warhammer", "Shield"), emptyList(), "Tank / smiter",        "🛡",  "Vayne",    15, 10, 13, 8,  12, 14, 10),
+    Archetype("Steel Knight",    "Fighter",   "Human",      "Soldier",           "Tough",    "Neutral Good", listOf("Chain Mail", "Longsword", "Shield"), emptyList(), listOf("Fighting Style (Protection)", "Second Wind"), listOf("Longsword (Sap)"), "Frontline tank",       "⚔",  "Aldric",   15, 13, 14, 8,  12, 10, 10),
+    Archetype("Shadow Blade",    "Rogue",     "Elf",        "Criminal",          "Alert",    "Chaotic Neutral", listOf("Leather Armor", "Shortsword", "Thieves' Tools"), emptyList(), listOf("Sneak Attack (1d6)", "Thieves' Cant"), listOf("Shortsword (Vex)"), "Stealth skirmisher", "🗡",  "Sable",    10, 15, 14, 13, 12, 8,  8),
+    Archetype("Spell Scholar",   "Wizard",    "Gnome",      "Sage",              "Skilled",  "Neutral",      listOf("Scholar's Pack", "Arcane Focus", "Spellbook"), listOf("Magic Missile", "Shield", "Fire Bolt"), listOf("Arcane Recovery", "Ritual Casting"), emptyList(), "Ranged nuker",         "📖", "Elara",    8,  14, 13, 15, 12, 10, 6),
+    Archetype("Dawn Shepherd",   "Cleric",    "Halfling",   "Acolyte",           "Magic Initiate", "Lawful Good",  listOf("Scale Mail", "Mace", "Holy Symbol"), listOf("Cure Wounds", "Bless", "Sacred Flame"), listOf("Disciple of Life", "Channel Divinity"), emptyList(), "Healer / support",     "☀",  "Mira",     13, 10, 14, 12, 15, 8,  8),
+    Archetype("Wild Tracker",    "Ranger",    "Elf",        "Outlander",         "Alert",    "Neutral Good", listOf("Scale Mail", "Longbow", "Shortswords"), emptyList(), listOf("Favored Enemy", "Deft Explorer"), listOf("Longbow (Slow)"), "Ranged skirmisher",    "🏹", "Fenris",   13, 15, 12, 10, 14, 8,  10),
+    Archetype("Storm Berserker", "Barbarian", "Goliath",    "Hermit",            "Tough",    "Chaotic Good", listOf("Greataxe", "Javelins", "Explorer's Pack"), emptyList(), listOf("Rage", "Unarmored Defense"), listOf("Greataxe (Topple)"), "Pure bruiser",         "🌩", "Grak",     15, 13, 14, 8,  12, 10, 12),
+    Archetype("Silver-Tongue",   "Bard",      "Human",      "Entertainer",       "Skilled",  "Chaotic Good", listOf("Leather Armor", "Rapier", "Lute"), listOf("Healing Word", "Dissonant Whispers", "Vicious Mockery"), listOf("Bardic Inspiration (d6)"), listOf("Rapier (Vex)"), "Face / utility",       "🎭", "Vesper",   8,  14, 12, 13, 10, 15, 8),
+    Archetype("Dragon-Blooded",  "Sorcerer",  "Dragonborn", "Noble",             "Magic Initiate", "Neutral",      listOf("Dagger", "Component Pouch", "Arcane Focus"), listOf("Mage Armor", "Shield", "Ray of Frost"), listOf("Innate Sorcery", "Font of Magic"), emptyList(), "Burst caster",         "🐉", "Skarrex",  8,  14, 13, 12, 10, 15, 6),
+    Archetype("Fiend-Pact",      "Warlock",   "Tiefling",   "Charlatan",         "Skilled",  "Chaotic Evil", listOf("Leather Armor", "Dagger", "Arcane Focus"), listOf("Eldritch Blast", "Hellish Rebuke", "Armor of Agathys"), listOf("Pact Boon", "Eldritch Invocations"), emptyList(), "Mid-range caster",     "🔥", "Mordecai", 8,  14, 13, 12, 10, 15, 8),
+    Archetype("Moon Druid",      "Druid",     "Elf",        "Hermit",            "Magic Initiate", "Neutral",      listOf("Leather Armor", "Quarterstaff", "Druidic Focus"), listOf("Entangle", "Thunderwave", "Produce Flame"), listOf("Wild Shape", "Combat Wild Shape"), emptyList(), "Versatile caster",     "🌙", "Sylva",    10, 13, 14, 12, 15, 8,  8),
+    Archetype("Open Hand",       "Monk",      "Human",      "Acolyte",           "Tough",    "Lawful Neutral", listOf("Quarterstaff", "Darts (10)"), emptyList(), listOf("Martial Arts (d6)", "Unarmored Defense"), listOf("Quarterstaff (Topple)"), "Mobile striker",       "🥋", "Tenzin",   13, 15, 14, 10, 12, 8,  8),
+    Archetype("Oath Knight",     "Paladin",   "Dwarf",      "Noble",             "Tough",    "Lawful Good",  listOf("Chain Mail", "Warhammer", "Shield"), emptyList(), listOf("Lay on Hands", "Divine Sense"), listOf("Warhammer (Push)"), "Tank / smiter",        "🛡",  "Vayne",    15, 10, 13, 8,  12, 14, 10),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -719,5 +727,63 @@ private fun getStatValue(state: CharacterCreationState, stat: String): Int {
         "wisdom" -> state.wisdom
         "charisma" -> state.charisma
         else -> 8
+    }
+}
+
+@Composable
+fun BackstoryRevealScreen(
+    state: CharacterCreationState,
+    onConfirm: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Your Legend Begins",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(Modifier.height(24.dp))
+        
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(modifier = Modifier.padding(20.dp)) {
+                if (state.isGeneratingBackstory && state.backstory.isEmpty()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Weaving your tale...", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text(
+                        text = state.backstory,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Button(
+            onClick = onConfirm,
+            enabled = !state.isGeneratingBackstory,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Begin the Journey", style = MaterialTheme.typography.titleMedium)
+        }
     }
 }
