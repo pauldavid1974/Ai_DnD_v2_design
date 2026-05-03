@@ -49,6 +49,7 @@ fun CharacterSheetScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var activeTab by remember { mutableStateOf(SheetTab.MAIN) }
+    val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(characterId) { viewModel.loadCampaign(characterId) }
 
@@ -118,14 +119,87 @@ fun CharacterSheetScreen(
                 Box(modifier = Modifier.weight(1f)) {
                     when (activeTab) {
                         SheetTab.MAIN -> MainTab(character)
-                        SheetTab.INVENTORY -> InventoryTab(character)
-                        SheetTab.SPELLS -> SpellbookTab(character)
+                        SheetTab.INVENTORY -> InventoryTab(character, onDetailClick = { viewModel.showDetail(it, "ITEM") })
+                        SheetTab.SPELLS -> SpellbookTab(character, onDetailClick = { viewModel.showDetail(it, "SPELL") })
                         SheetTab.JOURNAL -> JournalTab(character)
                         SheetTab.DICE -> DiceTab(character)
-                        SheetTab.FEATURES -> FeaturesTab(character)
+                        SheetTab.FEATURES -> FeaturesTab(character, onDetailClick = { viewModel.showDetail(it, "FEATURE") })
                         SheetTab.PARTY -> PartyTab(character)
                     }
                 }
+            }
+        }
+
+        // ── Detail Bottom Sheet ───────────────────────────────────────────────
+        if (state.selectedDetail != null || state.isDetailLoading) {
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.dismissDetail() },
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline) }
+            ) {
+                DetailContent(
+                    detail = state.selectedDetail,
+                    isLoading = state.isDetailLoading,
+                    onDismiss = { viewModel.dismissDetail() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailContent(
+    detail: com.pauldavid74.ai_dnd.feature.game.DetailInfo?,
+    isLoading: Boolean,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        if (isLoading) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Text("Retrieving SRD lore...", style = MaterialTheme.typography.bodyMedium)
+            }
+        } else if (detail != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = detail.type,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Text(
+                    text = detail.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Text(
+                text = detail.content,
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified // Default
+            )
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Close")
             }
         }
     }
@@ -294,7 +368,10 @@ private fun MainTab(character: com.pauldavid74.ai_dnd.core.database.entity.Chara
 }
 
 @Composable
-private fun InventoryTab(character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity) {
+private fun InventoryTab(
+    character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity,
+    onDetailClick: (String) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -308,7 +385,14 @@ private fun InventoryTab(character: com.pauldavid74.ai_dnd.core.database.entity.
                 Text("Your bag is empty.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 character.inventory.forEach { item ->
-                    Text("• $item", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "• $item", 
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDetailClick(item) }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
         }
@@ -320,7 +404,10 @@ private fun InventoryTab(character: com.pauldavid74.ai_dnd.core.database.entity.
 }
 
 @Composable
-private fun SpellbookTab(character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity) {
+private fun SpellbookTab(
+    character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity,
+    onDetailClick: (String) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -334,7 +421,14 @@ private fun SpellbookTab(character: com.pauldavid74.ai_dnd.core.database.entity.
                 Text("You know no spells.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 character.spells.forEach { spell ->
-                    Text("✦ $spell", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "✦ $spell", 
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDetailClick(spell) }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
         }
@@ -441,7 +535,10 @@ private fun DieButton(sides: Int, onRoll: () -> Unit, modifier: Modifier = Modif
 }
 
 @Composable
-private fun FeaturesTab(character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity) {
+private fun FeaturesTab(
+    character: com.pauldavid74.ai_dnd.core.database.entity.CharacterEntity,
+    onDetailClick: (String) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -455,7 +552,14 @@ private fun FeaturesTab(character: com.pauldavid74.ai_dnd.core.database.entity.C
                 Text("No class features found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 character.classFeatures.forEach { feature ->
-                    Text("• $feature", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "• $feature", 
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDetailClick(feature) }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
         }
@@ -465,7 +569,14 @@ private fun FeaturesTab(character: com.pauldavid74.ai_dnd.core.database.entity.C
                 Text("No weapon masteries.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 character.weaponMasteries.forEach { mastery ->
-                    Text("⚔ $mastery", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "⚔ $mastery", 
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDetailClick(mastery) }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
         }

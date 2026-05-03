@@ -15,7 +15,15 @@ data class GameState(
     val streamingMessage: ChatMessage? = null,
     val sessionMemories: List<MemoryEntity> = emptyList(),
     val rollHistory: List<String> = emptyList(),
+    val selectedDetail: DetailInfo? = null,
+    val isDetailLoading: Boolean = false,
     val error: String? = null
+)
+
+data class DetailInfo(
+    val name: String,
+    val type: String,
+    val content: String
 )
 
 sealed class KineticEffect {

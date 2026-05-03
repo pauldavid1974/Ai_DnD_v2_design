@@ -479,4 +479,69 @@ class GameViewModel @Inject constructor(
     fun onEffectConsumed() {
         _uiState.update { it.copy(kineticEffect = null) }
     }
+
+    fun showDetail(name: String, type: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDetailLoading = true, selectedDetail = null) }
+            
+            val referenceId = "${type.lowercase()}_${name.lowercase().replace(" ", "_")}"
+            
+            // 1. Try local cache first
+            try {
+                val existing = gameRepository.getSrdReference(referenceId)
+                if (existing != null) {
+                    _uiState.update { it.copy(
+                        isDetailLoading = false,
+                        selectedDetail = DetailInfo(name, type, existing.contentJson)
+                    )}
+                    return@launch
+                }
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "Failed to query SRD cache", e)
+            }
+
+            // 2. AI Fallback
+            try {
+                val providerId = keyManager.getActiveProvider() ?: "openai"
+                val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
+                val prompt = """
+                    SYSTEM: You are a D&D 5.2.1 encyclopedia.
+                    TASK: Provide a concise, 1-paragraph mechanical and flavor description for the $type: '$name'.
+                    RULE: Be specific about what it does in game terms if applicable.
+                """.trimIndent()
+                
+                var accumulated = ""
+                aiRepository.streamChat(providerId, modelId, prompt).collect { chunk ->
+                    accumulated += chunk
+                }
+
+                val info = DetailInfo(name, type, accumulated.trim())
+                
+                // Cache it
+                gameRepository.seedSrdData(listOf(
+                    com.pauldavid74.ai_dnd.core.database.entity.SrdReferenceEntity(
+                        id = referenceId,
+                        category = type.uppercase(),
+                        name = name,
+                        contentJson = accumulated.trim()
+                    )
+                ))
+
+                _uiState.update { it.copy(
+                    isDetailLoading = false,
+                    selectedDetail = info
+                )}
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Failed to generate detail", e)
+                _uiState.update { it.copy(
+                    isDetailLoading = false,
+                    error = "Could not find info for $name."
+                )}
+            }
+        }
+    }
+
+    fun dismissDetail() {
+        _uiState.update { it.copy(selectedDetail = null) }
+    }
 }
