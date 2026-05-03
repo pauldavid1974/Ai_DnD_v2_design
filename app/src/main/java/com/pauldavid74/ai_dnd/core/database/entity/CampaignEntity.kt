@@ -8,6 +8,9 @@ data class CampaignEntity(
     @PrimaryKey val id: String,
     val name: String,
     val description: String,
+    val author: String = "",
+    val licenseType: String = "",
+    val attributionText: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val lastPlayed: Long = System.currentTimeMillis()
 )

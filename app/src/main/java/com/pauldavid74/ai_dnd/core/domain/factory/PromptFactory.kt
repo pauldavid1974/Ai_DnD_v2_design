@@ -14,15 +14,24 @@ class PromptFactory @Inject constructor(
 ) {
 
     fun createIntroPrompt(
-        character: CharacterEntity
+        character: CharacterEntity,
+        campaign: com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity? = null
     ): String {
+        val campaignContext = if (campaign != null) {
+            """
+            CAMPAIGN: ${campaign.name}
+            PREMISE: ${campaign.description}
+            """.trimIndent()
+        } else "CAMPAIGN: Generic D&D Adventure"
+
         return """
             SYSTEM: You are a D&D 5.2.1 Dungeon Master. 
             CONTEXT:
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
             - Inventory: ${character.inventory.joinToString(", ")}
+            $campaignContext
             
-            TASK: Provide a concrete, grounded opening narration for the START of a new adventure. 
+            TASK: Provide a concrete, grounded opening narration for the START of this adventure.
             
             JSON SCHEMA:
             {
@@ -60,6 +69,7 @@ class PromptFactory @Inject constructor(
             - Player: ${character.name} (Level ${character.level} ${character.characterClass})
             - Status: ${hpBucket.name.lowercase()}
             - Inventory: ${character.inventory.joinToString(", ")}
+            - KNOWN SPELLS: ${character.spells.joinToString(", ")} (The player can ONLY cast these spells. If they attempt another, deduce it but set a high impossibilityScore or set type to "improvised_action")
             $memoryContext
             $historyContext
             
@@ -88,9 +98,9 @@ class PromptFactory @Inject constructor(
             }
             
             RULES:
-            - "requires_check": Set to true if the action (like searching, climbing, or lying) has a chance of failure as per SRD 5.2.1.
+            - "requires_check": Set to true ONLY if the action (like searching, climbing, or lying) has a significant chance of failure. Routine tasks (opening a door, reading a known language) should be false.
             - "skill_type": Use the most relevant D&D 5.2.1 skill (e.g., "investigation" for searching for clues).
-            - "dc": Set a logical Difficulty Class (10=Easy, 15=Medium, 20=Hard).
+            - "dc": Set a logical Difficulty Class (10=Easy, 15=Medium, 20=Hard). Core plot-essential interactions should be 10 or 12.
             - "narration_prefix": Provide 1-2 sentences of grounded prose describing the *attempt* (not the outcome). Focus on physical action.
             - Output ONLY the raw JSON. Do NOT include markdown code blocks.
             - "impossibilityScore": 0 is routine, 100 is impossible.

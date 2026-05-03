@@ -22,6 +22,14 @@ class CharacterCreationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CharacterCreationState())
     val uiState: StateFlow<CharacterCreationState> = _uiState.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            repository.getAllCampaigns().collect { campaigns ->
+                _uiState.update { it.copy(availableCampaigns = campaigns) }
+            }
+        }
+    }
+
     fun onNameChanged(name: String) {
         _uiState.update { it.copy(name = name) }
     }
@@ -48,6 +56,10 @@ class CharacterCreationViewModel @Inject constructor(
 
     fun onInventoryChanged(inventory: List<String>) {
         _uiState.update { it.copy(inventory = inventory) }
+    }
+
+    fun selectCampaign(campaignId: String) {
+        _uiState.update { it.copy(selectedCampaignId = campaignId) }
     }
 
     fun onMethodChanged(method: GenerationMethod) {
@@ -131,6 +143,11 @@ class CharacterCreationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             try {
+                val state = _uiState.value
+                if (state.selectedCampaignId == null) {
+                    throw Exception("No campaign selected")
+                }
+
                 // Calculate HP based on class hit die (MVP mapping)
                 val hitDie = when (state.characterClass.lowercase()) {
                     "barbarian" -> 12
@@ -144,6 +161,7 @@ class CharacterCreationViewModel @Inject constructor(
                 val maxHp = CharacterCreationEngine.calculateInitialHp(hitDie, conMod)
 
                 val character = CharacterEntity(
+                    campaignId = state.selectedCampaignId!!,
                     name = state.name,
                     species = state.species,
                     characterClass = state.characterClass,
@@ -165,6 +183,10 @@ class CharacterCreationViewModel @Inject constructor(
                 Log.d("CharacterCreation", "Saving character: $character")
                 val newId = repository.saveCharacter(character)
                 Log.d("CharacterCreation", "Character saved with ID: $newId")
+                
+                // Initialize the scenario graph for this character/campaign (Session Zero)
+                repository.initializeScenarioForCharacter(newId, state.selectedCampaignId!!)
+
                 _uiState.update { it.copy(createdCharacterId = newId, isComplete = true, isSaving = false) }
             } catch (e: Exception) {
                 Log.e("CharacterCreation", "Error saving character", e)

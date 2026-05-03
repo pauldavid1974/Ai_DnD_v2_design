@@ -17,13 +17,20 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val keyManager: KeyManager,
-    private val aiRepository: AiProviderRepository
+    private val aiRepository: AiProviderRepository,
+    private val gameRepository: com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsState())
     val uiState: StateFlow<SettingsState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            gameRepository.getAllCampaigns().collect { campaigns ->
+                _uiState.update { it.copy(installedCampaigns = campaigns) }
+            }
+        }
+
         val activeProviderId = keyManager.getActiveProvider() ?: ""
         val allProviderIds = LLMProvider.ALL_PROVIDERS.map { it.id }
         

@@ -22,28 +22,23 @@ class GenericOpenAiProvider(
 ) : AiProvider {
 
     override suspend fun getAvailableModels(apiKey: String): List<AiModel> {
-        return try {
-            val url = if (baseUrl.endsWith("/")) "${baseUrl}models" else "$baseUrl/models"
-            Log.d("GenericOpenAiProvider", "[$id] Fetching models from: $url")
-            
-            val response: HttpResponse = httpClient.get(url) {
-                header(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
-            
-            if (response.status != HttpStatusCode.OK) {
-                Log.e("GenericOpenAiProvider", "[$id] Error status: ${response.status}")
-                return emptyList()
-            }
-
-            val responseText = response.bodyAsText()
-            Log.d("GenericOpenAiProvider", "[$id] Raw response: ${responseText.take(500)}")
-            
-            val modelResponse: OpenAiModelsResponse = json.decodeFromString(responseText)
-            modelResponse.data.map { AiModel(it.id, it.id, id) }
-        } catch (e: Exception) {
-            Log.e("GenericOpenAiProvider", "[$id] Connection failed. URL: $baseUrl", e)
-            emptyList()
+        val url = if (baseUrl.endsWith("/")) "${baseUrl}models" else "$baseUrl/models"
+        Log.d("GenericOpenAiProvider", "[$id] Fetching models from: $url")
+        
+        val response: HttpResponse = httpClient.get(url) {
+            header(HttpHeaders.Authorization, "Bearer $apiKey")
         }
+        
+        if (response.status != HttpStatusCode.OK) {
+            Log.e("GenericOpenAiProvider", "[$id] Error status: ${response.status}")
+            throw Exception("Provider returned error: ${response.status}")
+        }
+
+        val responseText = response.bodyAsText()
+        Log.d("GenericOpenAiProvider", "[$id] Raw response: ${responseText.take(500)}")
+        
+        val modelResponse: OpenAiModelsResponse = json.decodeFromString(responseText)
+        return modelResponse.data.map { AiModel(it.id, it.id, id) }
     }
 
     override suspend fun streamChat(apiKey: String, modelId: String, prompt: String): Flow<String> = flow {

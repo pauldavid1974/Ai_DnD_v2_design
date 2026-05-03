@@ -1,7 +1,9 @@
 package com.pauldavid74.ai_dnd.core.rules
 
+import com.pauldavid74.ai_dnd.core.database.dao.CharacterDao
 import com.pauldavid74.ai_dnd.core.database.dao.EntityNodeDao
 import com.pauldavid74.ai_dnd.core.network.model.CastSpellIntent
+import kotlinx.coroutines.flow.first
 import com.pauldavid74.ai_dnd.core.network.model.ImprovisedActionIntent
 import com.pauldavid74.ai_dnd.core.network.model.MeleeAttackIntent
 import com.pauldavid74.ai_dnd.core.network.model.MoveIntent
@@ -24,16 +26,17 @@ sealed class ValidationResult {
 
 @Singleton
 class ActionValidatorImpl @Inject constructor(
-    private val entityNodeDao: EntityNodeDao
+    private val entityNodeDao: EntityNodeDao,
+    private val characterDao: CharacterDao
 ) : ActionValidator {
 
     override suspend fun validate(actorId: String, intent: PlayerIntent): ValidationResult {
-        val actor = entityNodeDao.getEntityById(actorId) ?: return ValidationResult.Failure("Actor not found")
+        val actorNode = entityNodeDao.getEntityById(actorId) ?: return ValidationResult.Failure("Actor node not found")
 
         return when (intent) {
             is MeleeAttackIntent -> {
                 val target = entityNodeDao.getEntityById(intent.targetNode) ?: return ValidationResult.Failure("Target not found")
-                val distance = calculateDistance(actor.x, actor.y, target.x, target.y)
+                val distance = calculateDistance(actorNode.x, actorNode.y, target.x, target.y)
                 if (distance > 5.0) { // Standard 5ft melee range
                     ValidationResult.Failure("Target too far: $distance ft")
                 } else {
@@ -41,7 +44,19 @@ class ActionValidatorImpl @Inject constructor(
                 }
             }
             is CastSpellIntent -> {
-                ValidationResult.RequiresSpellRoll(intent.spellId, intent.targetNodes, intent.castLevel)
+                // Fetch CharacterEntity to check known spells
+                // For MVP, we assume the actorId matches the character's long ID if it can be parsed, 
+                // or we use a more robust mapping if available. 
+                // Since actorId is "player1" in EncounterStateMachine, we need to handle this.
+                val character = characterDao.getAllCharacters().first().find { it.name == actorNode.name }
+                    ?: return ValidationResult.RequiresSpellRoll(intent.spellId, intent.targetNodes, intent.castLevel)
+
+                val knownSpells = character.spells.map { it.lowercase() }
+                if (!knownSpells.contains(intent.spellId.lowercase())) {
+                    ValidationResult.Failure("You do not have the spell '${intent.spellId}' prepared or known.")
+                } else {
+                    ValidationResult.RequiresSpellRoll(intent.spellId, intent.targetNodes, intent.castLevel)
+                }
             }
             is MoveIntent -> {
                 ValidationResult.Success

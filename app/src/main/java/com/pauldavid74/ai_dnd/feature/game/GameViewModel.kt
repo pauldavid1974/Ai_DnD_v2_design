@@ -95,6 +95,26 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    private fun observeChatHistory(characterId: Long) {
+        viewModelScope.launch {
+            gameRepository.getChatMessages(characterId).collect { savedMessages ->
+                val chatMessages = savedMessages.map { entity ->
+                    ChatMessage(entity.sender, entity.content, entity.timestamp)
+                }
+                _uiState.update { it.copy(chatMessages = chatMessages) }
+                
+                // Update roll history from chat messages
+                val historicalRolls = savedMessages
+                    .filter { it.content.startsWith("DICE_ROLL:") }
+                    .map { it.content.removePrefix("DICE_ROLL:") }
+                    .reversed()
+                    .take(20)
+                
+                _rollHistory.update { historicalRolls }
+            }
+        }
+    }
+
     private suspend fun observeStateMachine() {
         encounterStateMachine.stateMachine.activeStatesFlow().collect { states ->
             val status = when {
@@ -268,23 +288,11 @@ class GameViewModel @Inject constructor(
                 )
             }
 
-            // Restore chat history and dice history
+            observeChatHistory(characterId)
+
+            // If history is empty, start intro
             gameRepository.getChatMessages(characterId).first().let { savedMessages ->
-                if (savedMessages.isNotEmpty()) {
-                    val chatMessages = savedMessages.map { entity ->
-                        ChatMessage(entity.sender, entity.content, entity.timestamp)
-                    }
-                    _uiState.update { it.copy(chatMessages = chatMessages) }
-                    
-                    // Extract dice rolls for the Dice tab history
-                    val historicalRolls = savedMessages
-                        .filter { it.content.startsWith("DICE_ROLL:") }
-                        .map { it.content.removePrefix("DICE_ROLL:") }
-                        .reversed() // Most recent first
-                        .take(20)
-                    
-                    _rollHistory.update { historicalRolls }
-                } else {
+                if (savedMessages.isEmpty()) {
                     startAdventure(character!!)
                 }
             }
@@ -297,7 +305,13 @@ class GameViewModel @Inject constructor(
                 _uiState.update { it.copy(uiStatus = GameUiStatus.GeneratingOutcome) }
                 val providerId = keyManager.getActiveProvider() ?: "openai"
                 val modelId = keyManager.getActiveModel(providerId) ?: "gpt-4"
-                val introPrompt = promptFactory.createIntroPrompt(character)
+                
+                // Fetch campaign details for context
+                val campaign = if (character.campaignId.isNotEmpty()) {
+                    gameRepository.getAllCampaigns().firstOrNull()?.find { it.id == character.campaignId }
+                } else null
+
+                val introPrompt = promptFactory.createIntroPrompt(character, campaign)
                 
                 var accumulated = ""
                 aiRepository.streamChat(providerId, modelId, introPrompt).collect { chunk ->
@@ -414,7 +428,7 @@ class GameViewModel @Inject constructor(
                 ).collect { intent ->
                     intentFound = true
                     lastDucedIntent = intent
-                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(intent))
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(intent, character))
                 }
 
                 if (!intentFound) {
@@ -425,7 +439,7 @@ class GameViewModel @Inject constructor(
                         narrationPrefix = "You attempt to $text."
                     )
                     lastDucedIntent = fallbackIntent
-                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(fallbackIntent))
+                    encounterStateMachine.stateMachine.processEvent(EncounterEvent.IntentEvent(fallbackIntent, character))
                 }
             } catch (e: Exception) {
                 Log.e("GameViewModel", "Intent extraction failed", e)
@@ -439,7 +453,25 @@ class GameViewModel @Inject constructor(
 
     fun onUndo() {
         viewModelScope.launch {
-            encounterStateMachine.stateMachine.processEvent(EncounterEvent.RollbackRequested)
+            val characterId = _uiState.value.character?.id ?: return@launch
+            
+            // Delete until we've removed the last User message
+            // We'll delete max 5 messages to be safe (AI narration + System Roll + User message)
+            var deletedUserMsg = false
+            for (i in 1..5) {
+                val lastMsg = _uiState.value.chatMessages.lastOrNull() ?: break
+                gameRepository.deleteLastMessage(characterId)
+                if (lastMsg.sender == MessageSender.USER) {
+                    deletedUserMsg = true
+                    break
+                }
+                // Update local state temporarily for the loop
+                _uiState.update { it.copy(chatMessages = it.chatMessages.dropLast(1)) }
+            }
+            
+            if (deletedUserMsg) {
+                encounterStateMachine.stateMachine.processEvent(EncounterEvent.RollbackRequested)
+            }
         }
     }
 

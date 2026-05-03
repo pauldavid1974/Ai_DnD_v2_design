@@ -7,6 +7,7 @@ import kotlin.math.floor
 @Entity(tableName = "characters")
 data class CharacterEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val campaignId: String = "", // Associated campaign
     val name: String,
     val species: String,
     val characterClass: String,

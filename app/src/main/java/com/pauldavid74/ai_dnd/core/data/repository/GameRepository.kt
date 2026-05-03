@@ -8,6 +8,7 @@ import com.pauldavid74.ai_dnd.core.database.entity.MemoryEntity
 import com.pauldavid74.ai_dnd.core.database.entity.ScenarioEdgeEntity
 import com.pauldavid74.ai_dnd.core.database.entity.ScenarioNodeEntity
 import com.pauldavid74.ai_dnd.core.database.entity.SrdReferenceEntity
+import com.pauldavid74.ai_dnd.core.domain.model.CampaignImportPayload
 import kotlinx.coroutines.flow.Flow
 
 interface GameRepository {
@@ -22,6 +23,7 @@ interface GameRepository {
     fun getChatMessages(characterId: Long): Flow<List<ChatMessageEntity>>
     suspend fun saveChatMessage(message: ChatMessageEntity)
     suspend fun deleteChatHistory(characterId: Long)
+    suspend fun deleteLastMessage(characterId: Long)
 
     // Memory
     fun getAllMemories(): Flow<List<MemoryEntity>>
@@ -42,4 +44,11 @@ interface GameRepository {
     suspend fun saveScenarioEdges(edges: List<ScenarioEdgeEntity>)
     fun getFrontsForCampaign(campaignId: String): Flow<List<FrontEntity>>
     suspend fun saveFronts(fronts: List<FrontEntity>)
+    
+    // Session / Scenario State
+    suspend fun initializeScenarioForCharacter(characterId: Long, campaignId: String)
+    
+    // Bootstrapper
+    fun checkIfCampaignExists(id: String): Boolean
+    suspend fun importExternalCampaign(payload: CampaignImportPayload)
 }

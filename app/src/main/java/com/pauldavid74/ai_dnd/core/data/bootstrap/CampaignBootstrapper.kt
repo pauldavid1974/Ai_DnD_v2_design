@@ -1,7 +1,7 @@
 package com.pauldavid74.ai_dnd.core.data.bootstrap
 
 import android.app.Application
-import android.content.AssetManager
+import android.content.res.AssetManager
 import android.util.Log
 import com.pauldavid74.ai_dnd.core.data.repository.GameRepository
 import com.pauldavid74.ai_dnd.core.domain.model.CampaignImportPayload
@@ -19,6 +19,10 @@ class CampaignBootstrapper @Inject constructor(
 ) {
 
     private val assetManager: AssetManager = application.assets
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        coerceInputValues = true
+    }
 
     suspend fun initializeCampaigns() {
         withContext(Dispatchers.IO) {
@@ -41,7 +45,7 @@ class CampaignBootstrapper @Inject constructor(
         try {
             assetManager.open(fileName).use { inputStream ->
                 val jsonString = inputStream.readBytes().decodeToString()
-                val payload = Json.decodeFromString<CampaignImportPayload>(jsonString)
+                val payload = json.decodeFromString<CampaignImportPayload>(jsonString)
                 gameRepository.importExternalCampaign(payload)
                 Log.i("CampaignBootstrapper", "Successfully processed asset: $fileName")
             }

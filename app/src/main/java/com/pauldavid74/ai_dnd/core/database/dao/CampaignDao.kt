@@ -16,6 +16,9 @@ interface CampaignDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCampaign(campaign: CampaignEntity)
 
+    @Query("SELECT EXISTS(SELECT 1 FROM campaigns WHERE id = :id)")
+    fun existsById(id: String): Boolean
+
     @Query("SELECT * FROM fronts WHERE campaignId = :campaignId")
     fun getFrontsForCampaign(campaignId: String): Flow<List<FrontEntity>>
 

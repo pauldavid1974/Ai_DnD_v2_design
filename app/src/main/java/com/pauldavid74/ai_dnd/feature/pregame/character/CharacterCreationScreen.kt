@@ -2,10 +2,13 @@ package com.pauldavid74.ai_dnd.feature.pregame.character
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity
 import com.pauldavid74.ai_dnd.core.ui.theme.Ember
 import com.pauldavid74.ai_dnd.core.ui.theme.MutedInk
 
@@ -113,6 +117,13 @@ fun CharacterCreationScreen(
                 )
             }
 
+            // ── Campaign Selection (Always visible, more compact) ──────────────────
+            CampaignSelectionSection(
+                campaigns = state.availableCampaigns,
+                selectedCampaignId = state.selectedCampaignId,
+                onCampaignSelected = viewModel::selectCampaign
+            )
+
             // ── Tab content ────────────────────────────────────────────────────
             AnimatedContent(
                 targetState = activeTab,
@@ -141,6 +152,103 @@ fun CharacterCreationScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+// ── Campaign Selection Section ────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CampaignSelectionSection(
+    campaigns: List<CampaignEntity>,
+    selectedCampaignId: String?,
+    onCampaignSelected: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedCampaign = campaigns.find { it.id == selectedCampaignId }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Step 1: Select Your Adventure",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = selectedCampaign?.name ?: "Choose a Campaign",
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                ),
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                if (campaigns.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("No campaigns installed") },
+                        onClick = { expanded = false },
+                        enabled = false
+                    )
+                } else {
+                    campaigns.forEach { campaign ->
+                        DropdownMenuItem(
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = campaign.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (campaign.id == selectedCampaignId) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = campaign.description,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            },
+                            onClick = {
+                                onCampaignSelected(campaign.id)
+                                expanded = false
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                        )
+                    }
+                }
+            }
+        }
+        
+        if (selectedCampaign != null) {
+            Text(
+                text = selectedCampaign.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
     }
 }

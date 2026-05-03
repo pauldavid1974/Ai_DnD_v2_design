@@ -30,7 +30,8 @@ import com.pauldavid74.ai_dnd.core.ui.theme.Wine
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onBack: () -> Unit,
-    onNavigateToHome: () -> Unit
+    onNavigateToHome: () -> Unit,
+    onAboutClick: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -122,6 +123,31 @@ fun SettingsScreen(
                     Icon(Icons.Default.PlayArrow, null)
                     Spacer(Modifier.width(8.dp))
                     Text("Ready for Adventure", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // About & Legal
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Legal & Attributions", style = MaterialTheme.typography.titleMedium)
+                Surface(
+                    onClick = onAboutClick,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("About the App", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                            Text("Campaign licenses and attributions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Default.ChevronRight, null)
+                    }
                 }
             }
 
@@ -302,21 +328,16 @@ private fun ModelSelectionSection(
     onSave: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // ALWAYS use dropdown if possible. If models is empty BUT we have a selectedId, 
-        // it means we might be loading or the provider failed to list models.
         ModelDropdown(selectedModelId = selectedId, models = models, onSelect = onSelect)
         
-        if (models.isEmpty() && selectedId.isBlank()) {
-            Text("No chat models found. You can still enter a model name manually below.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            OutlinedTextField(
-                value = selectedId,
-                onValueChange = onSelect,
-                label = { Text("Model Selector") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
+        if (models.isEmpty()) {
+            Text(
+                text = if (selectedId.isBlank()) 
+                    "No chat models found. You can still enter a model name manually above." 
+                    else "Could not fetch model list. Manual input is active.", 
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                style = MaterialTheme.typography.labelSmall
             )
-        } else if (models.isEmpty() && selectedId.isNotBlank()) {
-            Text("Could not fetch model list. Manual input is active.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
             
         AnimatedContent(targetState = isSaved, label = "save_btn") { saved ->
@@ -350,11 +371,16 @@ private fun ModelDropdown(selectedModelId: String, models: List<AiModel>, onSele
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = currentModel?.name ?: selectedModelId.ifBlank { "Select a Model" },
-            onValueChange = { onSelect(it) }, // Allow typing if it's already a manual ID
+            value = currentModel?.name ?: selectedModelId,
+            onValueChange = { onSelect(it) },
             readOnly = models.isNotEmpty(),
             label = { Text("Model Selector") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            placeholder = { Text(if (models.isEmpty()) "Enter model name manually" else "Select a Model") },
+            trailingIcon = { 
+                if (models.isNotEmpty()) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) 
+                }
+            },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             shape = RoundedCornerShape(8.dp)
         )

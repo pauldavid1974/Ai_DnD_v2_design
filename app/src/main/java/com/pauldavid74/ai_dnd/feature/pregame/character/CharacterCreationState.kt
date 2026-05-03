@@ -20,7 +20,9 @@ data class CharacterCreationState(
     val isSaving: Boolean = false,
     val error: String? = null,
     val isComplete: Boolean = false,
-    val createdCharacterId: Long? = null
+    val createdCharacterId: Long? = null,
+    val availableCampaigns: List<com.pauldavid74.ai_dnd.core.database.entity.CampaignEntity> = emptyList(),
+    val selectedCampaignId: String? = null
 ) {
     val isValid: Boolean get() {
         val nameValid = name.isNotBlank()
@@ -28,6 +30,7 @@ data class CharacterCreationState(
         val classValid = characterClass.isNotBlank()
         val backgroundValid = background.isNotBlank()
         val alignmentValid = alignment.isNotBlank()
+        val campaignValid = selectedCampaignId != null
         val statsValid = when (generationMethod) {
             GenerationMethod.STANDARD_ARRAY -> {
                 val stats = listOf(strength, dexterity, constitution, intelligence, wisdom, charisma)
@@ -38,7 +41,7 @@ data class CharacterCreationState(
                 listOf(strength, dexterity, constitution, intelligence, wisdom, charisma).all { it in 8..15 }
             }
         }
-        return nameValid && speciesValid && classValid && backgroundValid && alignmentValid && statsValid
+        return nameValid && speciesValid && classValid && backgroundValid && alignmentValid && campaignValid && statsValid
     }
 }
 enum class GenerationMethod {
