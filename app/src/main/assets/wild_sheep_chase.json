@@ -1,12 +1,89 @@
 {
   "campaign_metadata": {
     "id": "c_wild_sheep_01",
-    "name": "A Wild Sheep Chase",
-    "description": "A frantic sheep, a Scroll of Speak with Animals, and a wizard's feud.",
-    "author": "Winghorn Press",
-    "licenseType": "OGL / Fan Content",
-    "attributionText": "Created by Winghorn Press. Distributed freely as Fan Content."
+    "name": "The Wild Sheep Chase",
+    "description": "A frantic sheep, a Scroll of Speak with Animals, and a fierce determination to get their attention. [cite: 4]",
+    "author": "Richard Jansen-Parkes [cite: 251]",
+    "licenseType": "Community Content Agreement for Dungeon Masters Guild [cite: 250]",
+    "attributionText": "Copyright 2016 by Richard Jansen-Parkes and published under the Community Content Agreement for Dungeon Masters Guild. [cite: 251]"
   },
-  "nodes": [],
-  "edges": []
+  "nodes": [
+    {
+      "id": "node_tavern_01",
+      "campaignId": "c_wild_sheep_01",
+      "title": "The Local Tavern",
+      "type": "SOCIAL",
+      "description": "The party is idling away an afternoon. [cite: 18] There is a sound of clattering hooves, surprised yelps and a frantic bleating. [cite: 21] A beast appears to be a regular sheep in every way fluffy white coat, black face, curled horns but it is carrying an elaborate scroll in its mouth. [cite: 23] A wax seal purports that it is a Scroll of Speak With Animals (Modified). [cite: 25]",
+      "clues": [
+        {
+          "clue_id": "c_01",
+          "condition": "Use the scroll",
+          "reveal": "The sheep's baaing instantly morphs into cultured, elven-accented Common. [cite: 27] The sheep introduces itself as Finethir Shinebright, a wizard in dire need of aid. [cite: 28]"
+        }
+      ],
+      "threats": []
+    },
+    {
+      "id": "node_road_02",
+      "campaignId": "c_wild_sheep_01",
+      "title": "The Ambush",
+      "type": "COMBAT",
+      "description": "A huge Half-Orc swaggers towards you, pushing his way through the crowd without a care for anybody standing in his way. [cite: 43] In front of him walk appear to be large wolves wearing iron collars, while a hulking figure in a dirty brown cloak travels in his wake. [cite: 44] He demands that he be given Master Noke's sheep. [cite: 46, 48]",
+      "clues": [
+        {
+          "clue_id": "c_02",
+          "condition": "Passive Insight 12",
+          "reveal": "Guz is not a bright fellow, but he is very loyal and determined to complete his task. [cite: 50] He is also willing to offer bribes and promises of magical favours. [cite: 52]"
+        }
+      ],
+      "threats": ["guz", "wolf", "brown bear"]
+    },
+    {
+      "id": "node_tower_ext_03",
+      "campaignId": "c_wild_sheep_01",
+      "title": "The House in the Woods",
+      "type": "EXPLORATION",
+      "description": "Rather than stone or glass, the house before you seems to have been formed from the living branches of four sturdy oak trees. [cite: 117] There is a trio of Apes either sleeping or playing with an oversized pair of dice on the lawn, with iron greatswords stuck into the ground next to them. [cite: 129] A Brown Bear is in the outhouse. [cite: 130]",
+      "clues": [
+        {
+          "clue_id": "c_03",
+          "condition": "Strength (Athletics) DC 14 or Thieves' Tools DC 12",
+          "reveal": "The door to the central platform is opened. [cite: 131]"
+        }
+      ],
+      "threats": ["ape", "brown bear"]
+    },
+    {
+      "id": "node_tower_int_04",
+      "campaignId": "c_wild_sheep_01",
+      "title": "Noke's Bedroom",
+      "type": "COMBAT",
+      "description": "Noke will cast Expeditious Retreat and flee into the central platform, locking the door behind him. [cite: 164] He will move to his bedroom as fast as he can and casts True Polymorph on the largest thing he can find his bed. [cite: 165] He bursts from the roof of his bedroom riding the Bed Dragon Wyrmling, a beast that looks like a dragon carved from wood with billowing bedsheets for wings. [cite: 186, 187]",
+      "clues": [
+        {
+          "clue_id": "c_04",
+          "condition": "Intelligence (Arcana) DC 15",
+          "reveal": "The modifications have left the Wand of True Polymorph extremely unreliable. [cite: 233]"
+        }
+      ],
+      "threats": ["ahmed noke", "bed dragon wyrmling"]
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "node_tavern_01",
+      "targetNodeId": "node_road_02",
+      "description": "Shortly after Shinebright starts his story, Guz and his wolves ambush the party. [cite: 31, 47]"
+    },
+    {
+      "sourceNodeId": "node_road_02",
+      "targetNodeId": "node_tower_ext_03",
+      "description": "The party deals with Guz and follows the well-trodden route through sparse woodland to Shinebright's old house. [cite: 101, 104]"
+    },
+    {
+      "sourceNodeId": "node_tower_ext_03",
+      "targetNodeId": "node_tower_int_04",
+      "description": "The party breaches the central platform and forces Noke to retreat to his bedroom. [cite: 164]"
+    }
+  ]
 }
